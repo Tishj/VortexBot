@@ -1,35 +1,33 @@
 # **************************************************************************** #
 #                                                                              #
 #                                                         ::::::::             #
-#    update_movedb.py                                   :+:    :+:             #
+#    update_movedb2.py                                  :+:    :+:             #
 #                                                      +:+                     #
 #    By: tbruinem <tbruinem@student.codam.nl>         +#+                      #
 #                                                    +#+                       #
-#    Created: 2020/12/31 16:16:22 by tbruinem      #+#    #+#                  #
-#    Updated: 2020/12/31 16:23:19 by tbruinem      ########   odam.nl          #
+#    Created: 2021/01/02 10:56:07 by tbruinem      #+#    #+#                  #
+#    Updated: 2021/01/02 11:19:46 by tbruinem      ########   odam.nl          #
 #                                                                              #
 # **************************************************************************** #
 
-from selenium import webdriver
-from selenium.webdriver.common.by import By
 import pickle
+import requests
+from lxml import html
 
 movedb = dict()
-
-PATH = "./req/chromedriver.exe"
-driver = webdriver.Chrome(PATH)
-
-driver.get("https://wiki.pokemon-vortex.com/wiki/Attackdex")
-
-moves = driver.find_elements(by=By.XPATH, value="//*[@id=\"mw-content-text\"]/div/table/tbody/*")
+content = html.fromstring(requests.get('https://wiki.pokemon-vortex.com/wiki/Attackdex').content)
+moves = content.xpath('//*[@id=\"mw-content-text\"]/div/table/tbody/*')
 
 for move in moves:
-	movetype = move.get_attribute("class").split('-')[1]
-	information = move.find_elements(by=By.XPATH, value="./*")
-	movedb[information[0].text.replace(' ','-').lower()] = (movetype, int(information[3].text))
+	name, movetype, cost, power, acc, category = move.xpath('./*')
+#	print(name.text, movetype.attrib['class'], cost.text, power.text, acc.text, category.text)
+	movename = name.text
+	if not movename:
+		continue
+	print(movename[:-1])
+	movedb[movename[:-1]] = (movetype.attrib['class'], int(power.text))
 
-with open("movedb", "wb") as f:
+with open('movedb', 'wb') as f:
 	pickle.dump(movedb, f, pickle.HIGHEST_PROTOCOL)
 
-driver.quit()
 print("PokemonVortex movedatabase succesfully updated!, saved under 'movedb'")

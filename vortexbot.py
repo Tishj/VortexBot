@@ -106,12 +106,6 @@ def check_pokemon_name(mutex, pokefound):
 		last_pokemon = pokeName
 		time.sleep(1)
 
-def target_catchable_reached(enemy_hp):
-	return True if (enemy_hp >= 1 and enemy_hp <= 30) else False
-
-def target_sidequest_reached(enemy_hp):
-	return True if enemy_hp <= 0 else False
-
 def get_type_multiplier(dmgtype, weaknesses):
 	mult = 1
 	for weakness in weaknesses:
@@ -120,9 +114,9 @@ def get_type_multiplier(dmgtype, weaknesses):
 		mult *= multipliers[dmgtype][weakness]
 	return mult
 
-def simulate_scenarios(destination, hp, moves, funct, history=[]):
+def simulate_scenarios(destination, hp, moves, target_range, history=[]):
 #	print(hp)
-	if funct(hp): #if target hp is reached
+	if hp >= target_range[0] and hp <= target_range[1]: #if target hp is reached
 #		print(history)
 		return destination.append(history)
 	if hp <= 0 or (history and len(history) >= 8): #if it died when we didnt want it to die or this path is garbage
@@ -132,7 +126,7 @@ def simulate_scenarios(destination, hp, moves, funct, history=[]):
 			continue
 		newhistory = list(history)
 		newhistory.append(move)
-		simulate_scenarios(destination, hp - moves[move], moves, funct, newhistory)
+		simulate_scenarios(destination, hp - moves[move], moves, target_range, newhistory)
 	return destination
 
 #-----------------------------------CLASSES-----------------------------------------
@@ -196,9 +190,20 @@ class Player:
 
 		battle = Battle(self.pokemons) #initializes the battle
 		for enemy in battle.enemies: #loop over all enemies
-			ally, moveset = battle.ally_pokemon_choice(self.pokemons, enemy, target_sidequest_reached)
-			print(ally.name)
+			i, moveset = battle.ally_pokemon_choice(self.pokemons, enemy, (-5000,0))
+			if i == -1:
+				return print("No valid option could be found")
+			print("pokemon number:", i)
+			driver.find_element(by=By.XPATH, value="//*[@id='slot" + str(int(i) + 1) + "']/label/div").click() #select pokemon
+			driver.find_element(by=By.XPATH, value='//*[@id="ajax"]/form/p/input').submit() #press Continue
 			print(moveset)
+			time.sleep(0.5)
+			driver.find_element(by=By.XPATH, value="//*[text() = '" + moveset[0] + "\n" + "']").click() #select Move
+			driver.find_element(by=By.XPATH, value='//*[@id="ajax"]/form[2]/div/input[2]').submit() #press Attack
+			time.sleep(1)
+			enemy.hp = int(driver.find_element(by=By.XPATH, value='//*[@id="ajax"]/form[2]/div/table[1]/tbody/tr[1]/td[1]/strong').text.split(' ')[1])
+			self.pokemons[i].hp = int(driver.find_element(by=By.XPATH, value='//*[@id="ajax"]/form[2]/div/table[1]/tbody/tr[2]/td[2]/strong').text.split(' ')[1])
+			print(self.pokemons[i].hp, enemy.hp)
 			break
 
 	def catch(self):
@@ -206,11 +211,11 @@ class Player:
 
 		battle = Battle(self.pokemons) #initializes the battle
 		for enemy in battle.enemies: #loop over all enemies
-			ally, moveset = battle.ally_pokemon_choice(self.pokemons, enemy, target_catchable_reached)
-			if not ally:
+			i, moveset = battle.ally_pokemon_choice(self.pokemons, enemy, (1,30))
+			if i == -1:
 				print("No possible moveset could be found")
 				break
-			print(ally.name)
+			print(self.pokemons[i].name)
 			print(moveset)
 			break
 
@@ -230,7 +235,7 @@ class Battle:
 		for i, pokemon in enumerate(self.allies):
 			pokemon.hp = int(info[i][2].split(' ')[-1])
 
-	def ally_pokemon_choice(self,allies, enemy, funct):
+	def ally_pokemon_choice(self,allies, enemy, target_range):
 		simulation = [[] for _ in range(len(allies))]
 		for i, pokemon in enumerate(allies): #all remaining allies
 			if pokemon.hp <= 0:
@@ -241,17 +246,18 @@ class Battle:
 				if enemy.special == "metallic":
 					move_dmg[move] *= 0.75
 				move_dmg[move] /= 60
-			simulate_scenarios(simulation[i], enemy.hp, move_dmg, funct)
-		best_pokemon = None
+			simulate_scenarios(simulation[i], enemy.hp, move_dmg, target_range)
+		best_pokemon = -1
 		best_scenario = None
 		for i, simulate in enumerate(simulation):
 			if not simulate:
 				continue
-#			print(simulate)
+			print(allies[i].name)
 			for scenario in simulate:
+				print(scenario)
 				if best_scenario == None or len(best_scenario) > len(scenario):
 					best_scenario = scenario
-					best_pokemon = allies[i]
+					best_pokemon = i
 		return (best_pokemon, best_scenario)
 
 class Item:
@@ -284,7 +290,7 @@ class Pokemon:
 			self.hp = int(hp.split(' ')[-1])
 		if moves:
 			for move in moves:
-				move_name = move.replace(' ', '-').lower()
+				move_name = move
 				self.moves[move_name] = Move(move_name)
 			for move in self.moves:
 				same_type_attack_bonus = 1.5 if self.moves[move].type in self.types else 1
@@ -310,10 +316,10 @@ player = Player()
 player.login()
 player.move('team')
 player.init_team()
-player.gotta_catch_em_all()
+#player.gotta_catch_em_all()
 #player.move('map/live')
-player.catch()
+#player.catch()
 #player.move('map/live')
-#player.sidequest()
+player.sidequest()
 quit()
 #------------------------------------LOOP-----------------------------------
