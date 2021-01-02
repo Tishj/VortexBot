@@ -1,13 +1,13 @@
-from selenium import webdriver
-from selenium.webdriver.common.keys import Keys
-from selenium.webdriver.common.bidi import cdp
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as ec
-from selenium.common.exceptions import NoSuchElementException
-from selenium.common.exceptions import StaleElementReferenceException
+# from selenium import webdriver
+# from selenium.webdriver.common.keys import Keys
+# from selenium.webdriver.common.bidi import cdp
+# from selenium.webdriver.support.ui import WebDriverWait
+# from selenium.webdriver.support import expected_conditions as ec
+# from selenium.common.exceptions import NoSuchElementException
+# from selenium.common.exceptions import StaleElementReferenceException
 
-from selenium.webdriver.common.by import By
-from datetime import datetime
+# from selenium.webdriver.common.by import By
+# from datetime import datetime
 
 from threading import Thread, Lock
 import json, time, random, sys, os
@@ -46,7 +46,7 @@ names = sys.argv[1::]
 found = False
 
 PATH = "./req/chromedriver.exe"
-driver = webdriver.Chrome(PATH)
+# driver = webdriver.Chrome(PATH)
 
 #-------------------------------FUNCTIONS---------------------------------------------
 
@@ -153,8 +153,11 @@ class Player:
 		driver.get(BASE_URL + location)
 
 	def login(self):
-		config = open("config", "r")
-		username, password = config.read().split('\n')
+		config = open("config.json", "r")
+		data = json.load(config)
+		username = data['player']['username']
+		password = data['player']['password']
+		print(username, password, data['mode'])
 		driver.get("https://www.pokemon-vortex.com/login/")
 		username_field = driver.find_element_by_id("myusername")
 		password_field = driver.find_element_by_id("mypassword")
@@ -263,7 +266,7 @@ class Battle:
 		time.sleep(0.25)
 		enemy.hp = int(locateElement(driver, By.XPATH, '//*[@id="ajax"]/form[2]/div/table[1]/tbody/tr[1]/td[1]/strong').text.split(' ')[1])
 		ally.hp = int(locateElement(driver, By.XPATH, '//*[@id="ajax"]/form[2]/div/table[1]/tbody/tr[2]/td[2]/strong').text.split(' ')[1])
-		#enemy.hp = int(driver.find_element(by=By.XPATH, value='//*[@id="ajax"]/form[2]/div/table[1]/tbody/tr[1]/td[1]/strong').text.split(' ')[1])
+		# enemy.hp = int(driver.find_element(by=By.XPATH, value='//*[@id="ajax"]/form[2]/div/table[1]/tbody/tr[1]/td[1]/strong').text.split(' ')[1])
 		#ally.hp = int(driver.find_element(by=By.XPATH, value='//*[@id="ajax"]/form[2]/div/table[1]/tbody/tr[2]/td[2]/strong').text.split(' ')[1])
 
 	def select_ally(self, pokeslot):

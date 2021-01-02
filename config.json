@@ -1,0 +1,8 @@
+{
+	"player":
+	{
+		"username": "username",
+		"password": "password"
+	},
+	"mode": "catch"
+}
