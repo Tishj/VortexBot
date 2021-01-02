@@ -1,6 +1,11 @@
 from selenium import webdriver
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.common.bidi import cdp
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as ec
+from selenium.common.exceptions import NoSuchElementException
+from selenium.common.exceptions import StaleElementReferenceException
+
 from selenium.webdriver.common.by import By
 from datetime import datetime
 
@@ -44,6 +49,11 @@ PATH = "./req/chromedriver.exe"
 driver = webdriver.Chrome(PATH)
 
 #-------------------------------FUNCTIONS---------------------------------------------
+
+def locateElement(driver, by, value):
+	ignored_exceptions = (NoSuchElementException,StaleElementReferenceException,)
+	wait = WebDriverWait(driver, 10, ignored_exceptions=ignored_exceptions)
+	return wait.until(ec.visibility_of_element_located((by, value)))
 
 def dispatchKeyEvent(driver, name, options = {}):
 	options["type"] = name
@@ -186,25 +196,39 @@ class Player:
 			self.pokemons.append(Pokemon(info[i][0], info[i][1], "", info[i][5:9]))
 
 	def sidequest(self):
-		self.move('battle-sidequest/1')
+		time.sleep(1)
+		driver.get('https://www.pokemon-vortex.com/battle-sidequest/1')
 
+		target_range = (-5000, 0)
 		battle = Battle(self.pokemons) #initializes the battle
 		for enemy in battle.enemies: #loop over all enemies
-			i, moveset = battle.ally_pokemon_choice(self.pokemons, enemy, (-5000,0))
-			if i == -1:
-				return print("No valid option could be found")
-			print("pokemon number:", i)
-			driver.find_element(by=By.XPATH, value="//*[@id='slot" + str(int(i) + 1) + "']/label/div").click() #select pokemon
-			driver.find_element(by=By.XPATH, value='//*[@id="ajax"]/form/p/input').submit() #press Continue
-			print(moveset)
-			time.sleep(0.5)
-			driver.find_element(by=By.XPATH, value="//*[text() = '" + moveset[0] + "\n" + "']").click() #select Move
-			driver.find_element(by=By.XPATH, value='//*[@id="ajax"]/form[2]/div/input[2]').submit() #press Attack
-			time.sleep(1)
-			enemy.hp = int(driver.find_element(by=By.XPATH, value='//*[@id="ajax"]/form[2]/div/table[1]/tbody/tr[1]/td[1]/strong').text.split(' ')[1])
-			self.pokemons[i].hp = int(driver.find_element(by=By.XPATH, value='//*[@id="ajax"]/form[2]/div/table[1]/tbody/tr[2]/td[2]/strong').text.split(' ')[1])
-			print(self.pokemons[i].hp, enemy.hp)
-			break
+			if enemy.name == "":
+				return
+			for _ in range(len(self.pokemons)): #worst possible scenario, we need all pokitomon
+				i, moveset = battle.ally_pokemon_choice(self.pokemons, enemy, target_range) #select the best living ally with a given moveset
+				if i == -1:
+					return print("No valid option could be found")
+				print("Selected moveset:", moveset)
+				battle.select_ally(i)
+				for move in moveset: #loop over all the moves
+					while True: #attack can miss or the enemy can be mystic
+						time.sleep(0.25)
+						if battle.attack(enemy, i, move) == True or battle.allies[i].hp == 0: #keep trying this move until it succeeds or the ally dies
+							break
+					if battle.allies[i].hp <= 0 or (enemy.hp >= target_range[0] and enemy.hp <= target_range[1]): #if my dude died
+						while True:
+							loading_element = driver.find_element(By.XPATH, '//*[@id="loading"]')
+							if "visibility: hidden" in loading_element.get_attribute("style"):
+								break
+						locateElement(driver, By.XPATH, '//*[@id="ajax"]/form[2]/div/input[2]').submit()
+						#driver.find_element(by=By.XPATH, value='//*[@id="ajax"]/form[2]/div/input[2]').submit()
+						#time.sleep(1)
+						break
+					#time.sleep(1)
+				print("Done performing moves")
+				if enemy.hp >= target_range[0] and enemy.hp <= target_range[1]:
+					break
+				#time.sleep(1)
 
 	def catch(self):
 		driver.find_element(by=By.TAG_NAME, value="body").send_keys(Keys.SPACE)
@@ -235,26 +259,63 @@ class Battle:
 		for i, pokemon in enumerate(self.allies):
 			pokemon.hp = int(info[i][2].split(' ')[-1])
 
+	def update_hp(self, enemy, ally):
+		time.sleep(0.25)
+		enemy.hp = int(locateElement(driver, By.XPATH, '//*[@id="ajax"]/form[2]/div/table[1]/tbody/tr[1]/td[1]/strong').text.split(' ')[1])
+		ally.hp = int(locateElement(driver, By.XPATH, '//*[@id="ajax"]/form[2]/div/table[1]/tbody/tr[2]/td[2]/strong').text.split(' ')[1])
+		#enemy.hp = int(driver.find_element(by=By.XPATH, value='//*[@id="ajax"]/form[2]/div/table[1]/tbody/tr[1]/td[1]/strong').text.split(' ')[1])
+		#ally.hp = int(driver.find_element(by=By.XPATH, value='//*[@id="ajax"]/form[2]/div/table[1]/tbody/tr[2]/td[2]/strong').text.split(' ')[1])
+
+	def select_ally(self, pokeslot):
+		# driver.find_element(by=By.XPATH, value="//*[@id='slot" + str(int(pokeslot) + 1) + "']/label/div").click() #select pokemon
+		# driver.find_element(by=By.XPATH, value='//*[@id="ajax"]/form/p/input').submit() #press Continue
+		locateElement(driver, By.XPATH, "//*[@id='slot" + str(int(pokeslot) + 1) + "']/label/div").click()
+		locateElement(driver, By.XPATH, '//*[@id="ajax"]/form/p/input').submit()
+		#time.sleep(0.5)
+
+	def attack(self, enemy, pokeslot, move): #attack once
+		hp_before = enemy.hp
+		#driver.find_element(by=By.XPATH, value="//*[text() = '" + move + "\n" + "']").click() #select Move
+		#driver.find_element(by=By.XPATH, value='//*[@id="ajax"]/form[2]/div/input[2]').submit()
+		while True:
+			loading_element = driver.find_element(By.XPATH, '//*[@id="loading"]')
+			if "visibility: hidden" in loading_element.get_attribute("style"):
+				break
+		locateElement(driver, By.XPATH, "//*[text() = '" + move + "\n" + "']").click()
+		locateElement(driver, By.XPATH, '//*[@id="ajax"]/form[2]/div/input[2]').submit()
+		time.sleep(0.25)
+		while True:
+			loading_element = driver.find_element(By.XPATH, '//*[@id="loading"]')
+			if "visibility: hidden" in loading_element.get_attribute("style"):
+				break
+		self.update_hp(enemy, self.allies[pokeslot])
+		return True if hp_before != enemy.hp else False
+
 	def ally_pokemon_choice(self,allies, enemy, target_range):
 		simulation = [[] for _ in range(len(allies))]
 		for i, pokemon in enumerate(allies): #all remaining allies
 			if pokemon.hp <= 0:
 				continue
+			current_enemy = enemy
+			if current_enemy.name == "ditto":
+				current_enemy.types = pokemon.types
+				current_enemy.special = pokemon.special
+				current_enemy.name = pokemon.name
 			move_dmg = dict()
 			for move in pokemon.moves: #get effective damage against enemy
-				move_dmg[move] = pokemon.moves[move].raw_damage * get_type_multiplier(pokemon.moves[move].type, enemy.types)
-				if enemy.special == "metallic":
+				move_dmg[move] = pokemon.moves[move].raw_damage * get_type_multiplier(pokemon.moves[move].type, current_enemy.types)
+				if current_enemy.special == "metallic":
 					move_dmg[move] *= 0.75
 				move_dmg[move] /= 60
-			simulate_scenarios(simulation[i], enemy.hp, move_dmg, target_range)
+			simulate_scenarios(simulation[i], current_enemy.hp, move_dmg, target_range)
 		best_pokemon = -1
 		best_scenario = None
 		for i, simulate in enumerate(simulation):
 			if not simulate:
 				continue
-			print(allies[i].name)
+#			print(allies[i].name)
 			for scenario in simulate:
-				print(scenario)
+#				print(scenario)
 				if best_scenario == None or len(best_scenario) > len(scenario):
 					best_scenario = scenario
 					best_pokemon = i
@@ -320,6 +381,8 @@ player.init_team()
 #player.move('map/live')
 #player.catch()
 #player.move('map/live')
-player.sidequest()
+for _ in range(100):
+	print ("Sidequest #", _, sep="")
+	player.sidequest()
 quit()
 #------------------------------------LOOP-----------------------------------
