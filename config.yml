@@ -1,0 +1,109 @@
+#Used by the bot to login to pokemon-vortex
+player:
+  username: ''
+  password: ''
+
+#List of full names, names and/or types the pokemon-catcher stops on
+desired_pokemon:
+# - Shiny Charmander
+  - Articuno
+  - Zapdos
+  - Moltres
+  - Mewtwo
+  - Mew
+  - Raikou
+  - Entei
+  - Suicune
+  - Lugia
+  - Ho-oh
+  - Celebi
+  - Regirock
+  - Regice
+  - Registeel
+  - Latias
+  - Latios
+  - Kyogre
+  - Groudon
+  - Rayquaza
+  - Jirachi
+  - Deoxys
+  - Uxie
+  - Mesprit
+  - Azelf
+  - Dialga
+  - Palkia
+  - Giratina
+  - Heatran
+  - Regigigas
+  - Cresselia
+  - Darkrai
+  - Phione
+  - Manaphy
+  - Shaymin
+  - Arceus
+  - Victini
+  - Cobalion
+  - Terrakion
+  - Virizion
+  - Keldeo
+  - Tornadus
+  - Thundurus
+  - Landorus
+  - Reshiram
+  - Zekrom
+  - Kyurem
+  - Meloetta (Aria)
+  - Genesect
+  - Xerneas (Active)
+  - Xerneas (Neutral)
+  - Yveltal
+  - Zygarde
+  - Diancie
+  - Hoopa
+  - Volcanion
+  - Type-Null
+  - Silvally
+  - Tapu Koko
+  - Tapu Lele
+  - Tapu Bulu
+  - Tapu Fini
+  - Cosmog
+  - Cosmoem
+  - Solgaleo
+  - Lunala
+  - Magearna
+  - Marshadow
+  - Meltan
+  - Melmetal
+  - Zacian
+  - Zamazenta
+  - Eternatus
+  - Kubfu
+  - Urshifu (Rapid Strike)
+  - Urshifu (Single Strike)
+  - Zarude
+  - Nihilego
+  - Buzzwole
+  - Pheromosa
+  - Xurkitree
+  - Celesteela
+  - Kartana
+  - Guzzlord
+  - Poipole
+  - Naganadel
+  - Stakataka
+  - Blacephalon
+  - Necrozma
+# - Shiny
+# - Shadow
+# - Dark
+# - Mystic
+# - Metallic
+
+#Determines what the bot will do, current supported options are:
+#catch - Walk from left to right until a name from desired_pokemon has been found
+#sidequest - At the fastest speed possible it will do all sidequests, resetting when it gets to the final sidequest (RISKY)
+#gyms - Do all the required gyms to be able to catch legendaries (excludes the final gymbattles)
+#clanbattle - Similar to sidequests, will continue fighting in clanbattles until stopped
+
+mode: sidequest
