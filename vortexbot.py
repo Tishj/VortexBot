@@ -6,6 +6,7 @@ from selenium.webdriver.support import expected_conditions as ec
 from selenium.common.exceptions import NoSuchElementException
 from selenium.common.exceptions import StaleElementReferenceException
 from selenium.common.exceptions import TimeoutException
+from selenium.webdriver.chrome.service import Service
 
 from selenium.webdriver.common.by import By
 from datetime import datetime
@@ -57,7 +58,7 @@ found = False
 
 #Selenium set up
 PATH = "./req/chromedriver.exe"
-driver = webdriver.Chrome(PATH)
+driver = webdriver.Chrome(service=Service(PATH))
 
 #-------------------------------FUNCTIONS---------------------------------------------
 
