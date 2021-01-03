@@ -129,7 +129,6 @@ def check_pokemon_name(mutex, pokefound):
 		driver.execute_script('document.querySelector("#logout").text = Phaser.Display.Canvas.CanvasPool.pool[2].parent.scene.encounterProfile.pokeName._text')
 		pokeName = driver.find_element(by=By.ID, value="logout").get_attribute("text")
 		mutex.release()
-		pokeName = pokeName.lower().replace(' ', '')
 		if pokeName != last_pokemon:
 #			log.write(pokeName + "\n")
 			print("pokemon name:", pokeName)
@@ -466,12 +465,12 @@ class Pokemon:
 		if not name:
 			self.name = ""
 		else:
-			fullname = re.sub(r'[\(\.\'\)]', '', name.lower()).split(' ')
-			if fullname[0] in ["metallic","shiny","shadow","mystic","dark","pink","crystal","ancient"]:
+			fullname = name.split(' ')
+			if fullname[0] in ["Metallic","Shiny","Shadow","Mystic","Dark","Pink","Crystal","Ancient"]:
 				self.special = fullname[0]
-				self.name = "-".join(fullname[1:]) 
+				self.name = " ".join(fullname[1:]) 
 			else:
-				self.name = "-".join(fullname)
+				self.name = " ".join(fullname)
 			self.types = pokedb[self.name].types
 		if not level:
 			self.level = 0
@@ -488,7 +487,7 @@ class Pokemon:
 			for move in self.moves:
 				same_type_attack_bonus = 1.5 if self.moves[move].type in self.types else 1
 				self.moves[move].raw_damage = self.level * self.moves[move].power * same_type_attack_bonus
-				if self.special == "dark":
+				if self.special == "Dark":
 					self.moves[move].raw_damage *= 1.25
 
 class Move:

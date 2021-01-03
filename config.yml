@@ -106,4 +106,4 @@ desired_pokemon:
 #gyms - Do all the required gyms to be able to catch legendaries (excludes the final gymbattles)
 #clanbattle - Similar to sidequests, will continue fighting in clanbattles until stopped
 
-mode: gyms
+mode: catch

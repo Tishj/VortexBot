@@ -6,7 +6,7 @@
 #    By: tbruinem <tbruinem@student.codam.nl>         +#+                      #
 #                                                    +#+                       #
 #    Created: 2021/01/01 19:56:25 by tbruinem      #+#    #+#                  #
-#    Updated: 2021/01/01 22:09:25 by tbruinem      ########   odam.nl          #
+#    Updated: 2021/01/03 20:26:11 by tbruinem      ########   odam.nl          #
 #                                                                              #
 # **************************************************************************** #
 
@@ -27,7 +27,6 @@ for name in pokemon_names:
 	pokename = name.text
 	if pokename == None:
 		continue
-	pokename = re.sub(r'[\(\.\'\)]', '', pokename.lower()).replace(' ', '-')
 	types = []
 	moves = []
 	entry = html.fromstring(requests.get(WIKI_URL + name.get("href")).content)
