@@ -32,9 +32,9 @@ Once you've finished setting up the `config.yml` you can run the bot with `pytho
 
 ###  - Config
 
-The config is where the bot gets all it's inputs from, you need to set this up locally (config.yml)
+The `config.yml` is where the bot gets all it's inputs from
 
-It's a YML file that you will need to set up before using, the fields that are required to change are 'username' and 'password'.
+It's a YML file that you will need to set up before starting the bot, the fields that are required to change are 'username' and 'password'.
 - ##### Player
 ```
 player:
