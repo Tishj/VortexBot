@@ -5,7 +5,8 @@ player:
 
 #List of full names, names and/or types the pokemon-catcher stops on
 desired_pokemon:
-# - Shiny Charmander
+  - Shiny Charmander
+  - Shadow Charmander
   - Articuno
   - Zapdos
   - Moltres
@@ -106,4 +107,4 @@ desired_pokemon:
 #gyms - Do all the required gyms to be able to catch legendaries (excludes the final gymbattles)
 #clanbattle - Similar to sidequests, will continue fighting in clanbattles until stopped
 
-mode: catch
+mode: sidequest

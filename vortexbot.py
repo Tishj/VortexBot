@@ -123,11 +123,14 @@ def check_pokemon_name(mutex, pokefound):
 	last_pokemon = ""
 	global found
 #	global log
-	time.sleep(1)
 	while True:
 		mutex.acquire(1)
-		driver.execute_script('document.querySelector("#logout").text = Phaser.Display.Canvas.CanvasPool.pool[2].parent.scene.encounterProfile.pokeName._text')
-		pokeName = driver.find_element(by=By.ID, value="logout").get_attribute("text")
+		try:
+			driver.execute_script('document.querySelector("#logout").text = Phaser.Display.Canvas.CanvasPool.pool[2].parent.scene.encounterProfile.pokeName._text')
+			pokeName = driver.find_element(by=By.ID, value="logout").get_attribute("text")
+		except:
+			print("Name checker has encountered a fatal error")
+			os._exit(1)
 		mutex.release()
 		if pokeName != last_pokemon:
 #			log.write(pokeName + "\n")
@@ -156,7 +159,7 @@ def get_moves_finaldmg(pokemon, enemy):
 	move_dmg = dict()
 	for move in pokemon.moves:
 		move_dmg[move] = pokemon.moves[move].raw_damage * get_type_multiplier(pokemon.moves[move].type, enemy.types)
-		if enemy.special == "metallic":
+		if enemy.special == "Metallic":
 			move_dmg[move] *= 0.75
 		move_dmg[move] /= 60
 		move_dmg[move] = int(move_dmg[move])
@@ -227,6 +230,7 @@ class Player:
 		#log = open("log_" + datetime.now().strftime("%d-%m-%Y_%H-%M"), "w+")
 		global found
 		self.move('map/live')
+		locateElement(driver, By.XPATH, '//*[@id="mapapp"]')
 		found = False
 		mutex = Lock()
 		pokefound = Lock()
