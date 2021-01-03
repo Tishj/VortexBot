@@ -9,6 +9,7 @@ from selenium.common.exceptions import TimeoutException
 
 from selenium.webdriver.common.by import By
 from datetime import datetime
+from enum import Enum
 
 from threading import Thread, Lock
 import json, time, random, sys, os
@@ -255,6 +256,34 @@ class Player:
 		for i in range(len(info)):
 			self.pokemons.append(Pokemon(info[i][0], info[i][1], "", info[i][5:9]))
 
+	def gyms(self, only_unobtained=True):
+		GYM_BASE_URL = "https://www.pokemon-vortex.com/battle-gym/"
+
+		if only_unobtained:
+			driver.get('https://www.pokemon-vortex.com/gyms/')
+			notdone = driver.find_elements(by=By.XPATH, value='//*[@class="notDone"]/../..')
+			todo = [item.get_attribute('text')[:-1] for item in notdone if item.get_attribute('text') != None]
+		else:
+			todo = [
+			"Brock", "Misty", "Lt. Surge", "Erika", "Sabrina", "Janine", "Blaine", 
+			"Giovanni", "Cissy", "Danny", "Rudy", "Luana", "Drake", "Falkner", "Bugsy", 
+			"Whitney", "Morty", "Chuck", "Jasmine", "Pryce", "Clair", "Roxanne",
+			"Brawly", "Wattson", "Flannery", "Norman", "Winona", "Liza and Tate", "Juan", 
+			"Roark", "Gardenia", "Maylene", "Crasher Wake", "Fantina", "Byron", 
+			"Candice", "Volkner", "Cheren", "Roxie", "Burgh", "Elesa", "Clay", "Skyla", 
+			"Drayden", "Marlon", "Viola", "Grant", "Korrina", "Ramos", "Clemont", "Valerie", 
+			"Olympia", "Wulfric", "Ilima", "Lana", "Kiawe", "Mallow", "Sophocles", "Acerola", 
+			"Mina", "Hala", "Olivia", "Nanu", "Hapu"]
+
+		if todo == []:
+			print("You have obtained all gym badges already, try calling gyms with 'only_unobtained=False'")
+			quit()
+		for gym in todo:
+			driver.get(GYM_BASE_URL + gym)
+			while self.fight(Trainer(), 10) != True:
+				driver.get(GYM_BASE_URL + gym)
+		print("You have beaten all the (remaining) gyms!")
+
 	#Completes a 'fight', fight is classified as 6 allies and 1-6 enemies
 	#If the hp of the last enemy has reached the target (defined by the FightType) the function will return True
 	#If all allies have died and the enemy hasn't reached it's target, the function will return False
@@ -323,7 +352,7 @@ class Player:
 			return False
 		except:
 			pass
-		self.fight(Trainer(), 10)
+		return self.fight(Trainer(), 10)
 
 	def catch(self):
 		driver.find_element(by=By.TAG_NAME, value="body").send_keys(Keys.SPACE)
@@ -481,7 +510,7 @@ if config['mode'] == "catch":
 	player.catch()
 elif config['mode'] == "sidequest":
 	player.sidequest_loop()
-#else if config['mode'] == "gyms":
-#	player.gyms()
+elif config['mode'] == "gyms":
+	player.gyms()
 #else if config['mode'] == "clanbattle"
 #	player.clanbattle_loop
