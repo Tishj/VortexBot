@@ -21,6 +21,9 @@ import yaml
 
 #--------------------------------------INCLUDES--------------------------------------
 
+sidequest_number = 0
+last_battle_won = time.time() - 10
+
 try:
 	with open('config.yml', 'r') as f:
 		config = yaml.load(f)
@@ -301,13 +304,15 @@ class Player:
 		print("You have beaten all the (remaining) gyms!")
 
 	def sidequest_loop(self):
-		sidequest_count = 0
+		global sidequest_number
+		driver.get('https://www.pokemon-vortex.com/sidequests/')
+		sidequest_number = int(locateElement(driver, By.XPATH, '//*[@id="ajax"]/div[1]/p[2]/b').text)
 		start_time = datetime.now()
 		while True:
 			try:
 				if player.sidequest() == True:
-					sidequest_count += 1
-					print ("Sidequest #", sidequest_count, sep="")
+					sidequest_number += 1
+					print ("Sidequest #", sidequest_number, sep="")
 					elapsed = datetime.now() - start_time
 					minutes = divmod(int(elapsed.seconds), 60)
 					print(minutes[0], ":", minutes[1], sep="")
@@ -315,7 +320,8 @@ class Player:
 				pass
 
 	def sidequest(self):
-		driver.get('https://www.pokemon-vortex.com/battle-sidequest/1')
+		global sidequest_number
+		driver.get('https://www.pokemon-vortex.com/battle-sidequest/' + str(sidequest_number + 1))
 		if driver.current_url == "https://www.pokemon-vortex.com/sidequests/":
 			driver.find_element(by=By.XPATH, value='//*[@id="ajax"]/div[2]/form/button').click()
 			reward = locateElement(driver, By.XPATH, '//*[@id="ajax"]/div[1]/b').text
@@ -324,12 +330,13 @@ class Player:
 			print(reward)
 			print("Sidequest reward received!")
 			time.sleep(5)
-			driver.get('https://www.pokemon-vortex.com/battle-sidequest/1')
+			driver.get('https://www.pokemon-vortex.com/battle-sidequest/' + str(sidequest_number + 1))
 		try:
 			driver.find_element(by=By.XPATH, value="//*[text()='An error occurred with the sidequest battle you requested.']")
 			driver.find_element(by=By.XPATH, value="//*[text()='An error has occurred. Please try again later.']")
 			print("Looks like you've reached the end of the sidequests, will reset now!")
 			self.reset_sidequests()
+			sidequest_number = 0
 			return False
 		except:
 			pass
@@ -388,6 +395,26 @@ class WildEncounter(FightType):
 	def continue_button(self):
 		locateElement(driver, By.XPATH, '//*[@id="battleForm"]/div/input').submit()
 
+	def get_moveset(self, battle, enemy):
+		simulation = [[] for _ in range(len(battle.allies))]
+		for i, pokemon in enumerate(battle.allies):
+			if pokemon.hp <= 0:
+				continue
+#			move_dmg = get_moves_finaldmg(pokemon, enemy)
+			pokemon.set_movesdmg(enemy)
+			simulate_scenarios(simulation[i], copy.deepcopy(enemy), pokemon, battle.target_range)
+		best_pokemon = None
+		best_scenario = None
+		for i, simulate in enumerate(simulation):
+			if not simulate:
+				continue
+			for scenario in simulate:
+				if best_scenario == None or len(best_scenario) > len(scenario):
+					best_scenario = scenario
+					best_pokemon = i
+		battle.current_ally = battle.allies[best_pokemon]
+		return (best_scenario)
+
 #Used in sidequest battles and other trainer battles, the goal is to kill the enemy pokemon (target_range(-5000, 0))
 class Trainer(FightType):
 	def __init__(self):
@@ -410,6 +437,22 @@ class Trainer(FightType):
 
 	def continue_button(self):
 		locateElement(driver, By.XPATH, '//*[@id="ajax"]/form[2]/div/input[2]').submit()
+
+	def get_moveset(self, battle, enemy):
+		strongest_move = None
+		for ally in [x for x in battle.allies if not x.dead()]:
+			ally.set_movesdmg(enemy)
+			for move in ally.moves:
+				if strongest_move == None or ally.moves[move].damage > strongest_move.damage:
+					strongest_move = ally.moves[move]
+					battle.current_ally = ally
+				if strongest_move.damage >= enemy.hp:
+					break ;
+			if strongest_move.damage >= enemy.hp:
+				break ;
+		if strongest_move == None:
+			return []
+		return [strongest_move.name] * int((enemy.hp / strongest_move.damage) + 1)
 
 #Holds the data needed for a battle, enemies and hp primarily.
 class Battle:
@@ -444,11 +487,12 @@ class Battle:
 	#If the hp of the last enemy has reached the target (defined by the FightType) the function will return True
 	#If all allies have died and the enemy hasn't reached it's target, the function will return False
 	def fight(self, minimum_duration=0):
-		minimum_endtime = time.time() + minimum_duration
+		global last_battle_won
 		while self.current_enemy < len(self.enemies):
 			enemy = self.enemies[self.current_enemy]
-			for _ in range(len(self.allies)):
-				moveset = self.ally_pokemon_choice(enemy)
+			for _ in range(len([x for x in self.allies if not x.dead()])): #loop over all living allies
+#				moveset = self.ally_pokemon_choice(enemy)
+				moveset = self.fighttype.get_moveset(self,enemy)
 				if not self.current_ally:
 					print("No valid option could be found")
 					return False
@@ -462,9 +506,10 @@ class Battle:
 					if self.current_ally.dead() or enemy.hp_in_range(self.target_range):
 						finish_loading()
 						if enemy.hp_in_range(self.target_range) and self.last_enemy():
-							while time.time() < minimum_endtime:
+							while time.time() < last_battle_won + minimum_duration:
 								time.sleep(0.3)
 							self.continue_button()
+							last_battle_won = time.time()
 							return True
 						self.continue_button()
 						finish_loading()

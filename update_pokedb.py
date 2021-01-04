@@ -6,7 +6,7 @@
 #    By: tbruinem <tbruinem@student.codam.nl>         +#+                      #
 #                                                    +#+                       #
 #    Created: 2021/01/01 19:56:25 by tbruinem      #+#    #+#                  #
-#    Updated: 2021/01/03 20:26:11 by tbruinem      ########   odam.nl          #
+#    Updated: 2021/01/04 19:12:59 by tbruinem      ########   odam.nl          #
 #                                                                              #
 # **************************************************************************** #
 
@@ -50,6 +50,10 @@ for name in pokemon_names:
 #	print('----------------')
 	pokedb[pokename] = PokeEntry(name=pokename, types=types, moves=moves)
 	print(pokename)
+
+#wiki editors are retarded
+pokedb["Farfetch'd"] = pokedb.pop('Farfetchd')
+pokedb["Farfetch'd (Galarian)"] = pokedb.pop('Farfetchd (Galarian)')
 
 with open('pokedb', "wb") as f:
 	pickle.dump(pokedb, f, pickle.HIGHEST_PROTOCOL)
