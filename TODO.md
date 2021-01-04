@@ -8,3 +8,5 @@ Add the mode to fight a specific user
 
 Possibly extra big feature: MarketAssesment
 categorize prizes and bids for each pokemon, and based off of that information find cheap pokemon/items
+
+Calculate how fast the current enemy can kill the current pokemon, dont recurse any further than that

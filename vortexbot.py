@@ -40,9 +40,10 @@ except:
 	quit()
 
 #Variables used by the pokemon catching/finding functions
+criteria = dict()
 try:
-	names = config['desired_pokemon']
-	if names == []:
+	criteria['names'] = config['desired_pokemon']
+	if criteria['names'] == []:
 		raise Exception("Desired pokemon list empty")
 except:
 	print("Desired pokemon list is missing or empty")
@@ -54,7 +55,7 @@ except:
 		print("Mode missing")
 		quit()
 
-found = False
+found = None
 
 #Selenium set up
 PATH = "./req/chromedriver.exe"
@@ -74,12 +75,6 @@ def finish_loading():
 		loading_element = driver.find_element(By.XPATH, '//*[@id="loading"]')
 		if "visibility: hidden" in loading_element.get_attribute("style") or loading_element.get_attribute("style") == None:
 			break
-
-def hp_reached_target(hp, target_range):
-	return True if hp >= target_range[0] and hp <= target_range[1] else False
-
-def is_last_enemy(count, enemies):
-	return True if count == 5 or enemies[count + 1].name == "" else False
 
 def dispatchKeyEvent(driver, name, options = {}):
 	options["type"] = name
@@ -110,7 +105,7 @@ def holdKey(driver, pokefound, duration, key):
 		dispatchKeyEvent(driver, "char", options)
 
 		pokefound.acquire(1)
-		if time.time() > endtime or found == True:
+		if time.time() > endtime or found != None:
 			dispatchKeyEvent(driver, "keyUp", options)
 			pokefound.release()
 			break
@@ -118,31 +113,43 @@ def holdKey(driver, pokefound, duration, key):
 		options["autoRepeat"] = True
 		time.sleep(0.01)
 
+def evaluate_pokemon_info(mutex, pokefound, last_pokemon):
+	global found
+	global criteria
+	try:
+		mutex.acquire(1)
+		driver.execute_script('document.querySelector("#logout").text = Phaser.Display.Canvas.CanvasPool.pool[2].parent.scene.encounterProfile.pokeName._text')
+		driver.execute_script('document.querySelector("#battleTab > a").text = Phaser.Display.Canvas.CanvasPool.pool[2].parent.scene.encounterProfile.caughtImg._alpha')
+		driver.execute_script('document.querySelector("#yourAccountTab > a").text = Phaser.Display.Canvas.CanvasPool.pool[2].parent.scene.encounterProfile.pokeLvl._text')
+		pokeName = driver.find_element(by=By.ID, value="logout").get_attribute("text")
+		pokeCaught = bool(int())
+		result = driver.find_element(by=By.XPATH, value='//*[@id="yourAccountTab"]/a').get_attribute('text')
+		pokeLvl = 0 if result == "" else int(result.split(' ')[1])
+		result = driver.find_element(by=By.XPATH, value='//*[@id="battleTab"]/a').get_attribute('text')
+		pokeCaught = bool(int(result)) if pokeLvl != 0 else True
+		mutex.release()
+	except:
+		print("Name checker has encountered a fatal error")
+		os._exit(1)
+#	if criteria.has_key('')
+	if pokeLvl != 0 and pokeName != None and pokeName != last_pokemon:
+		for name in criteria['names']:
+			if name in pokeName:
+				pokefound.acquire(1)
+				found = (pokeName, pokeLvl, pokeCaught)
+				pokefound.release()
+				return True
+	last_pokemon[0] = pokeName
+	return False
+
 #Get the name of the current encountered pokemon and see if it matches the list of pokemon we're looking to catch
 def check_pokemon_name(mutex, pokefound):
 	last_pokemon = ""
-	global found
-#	global log
+	wrapper = [last_pokemon]
 	while True:
-		mutex.acquire(1)
-		try:
-			driver.execute_script('document.querySelector("#logout").text = Phaser.Display.Canvas.CanvasPool.pool[2].parent.scene.encounterProfile.pokeName._text')
-			pokeName = driver.find_element(by=By.ID, value="logout").get_attribute("text")
-		except:
-			print("Name checker has encountered a fatal error")
-			os._exit(1)
-		mutex.release()
-		if pokeName != last_pokemon:
-#			log.write(pokeName + "\n")
-			print("pokemon name:", pokeName)
-			for name in names:
-				if name in pokeName:
-					print("FOUND POKEMON")
-					pokefound.acquire(1)
-					found = True
-					pokefound.release()
-					return
-		last_pokemon = pokeName
+		if evaluate_pokemon_info(mutex, pokefound, wrapper):
+			return
+		print(wrapper[0])
 		time.sleep(1)
 
 #Return the type multiplier based of the move's type and the enemy type(s)
@@ -166,24 +173,24 @@ def get_moves_finaldmg(pokemon, enemy):
 	return (move_dmg)
 
 #Recursively checks all combinations of moves to see if they eventually lead to the enemy hp reaching target_range (defined by FightType)
-def simulate_scenarios(destination, enemy, pokemon, moves, target_range, history=[]):
+def simulate_scenarios(destination, enemy, pokemon, target_range, history=[]):
 	if enemy.hp >= target_range[0] and enemy.hp <= target_range[1]:
 		return destination.append(history)
 	if enemy.hp <= 0 or (history and len(history) >= 8):
 		return
-	for move in moves:
+	for move in pokemon.moves:
 		new_enemy = copy.deepcopy(enemy)
-		if history != [] and enemy.name == "ditto":
+		if history != [] and enemy.name == "Ditto":
 			new_enemy.types = pokemon.types
 			new_enemy.name = pokemon.name
 			new_enemy.special = pokemon.special
-			moves = get_moves_finaldmg(pokemon, new_enemy)
-		if moves[move] == 0:
+			pokemon.set_movesdmg(enemy)
+		if pokemon.moves[move].damage == 0:
 			continue
 		newhistory = list(history)
 		newhistory.append(move)
-		new_enemy.hp -= moves[move]
-		simulate_scenarios(destination, new_enemy, pokemon, moves, target_range, newhistory)
+		new_enemy.hp -= pokemon.moves[move].damage
+		simulate_scenarios(destination, new_enemy, pokemon, target_range, newhistory)
 	return destination
 
 #-----------------------------------CLASSES-----------------------------------------
@@ -231,16 +238,19 @@ class Player:
 		global found
 		self.move('map/live')
 		locateElement(driver, By.XPATH, '//*[@id="mapapp"]')
-		found = False
+		found = None
 		mutex = Lock()
 		pokefound = Lock()
+		time.sleep(4)
+		if evaluate_pokemon_info(mutex, pokefound, [""]):
+			return
 		thread = Thread(target=check_pokemon_name, args=(mutex,pokefound,))
 		thread.start()
 		#find_pokemon
 		offset = 0
 		while (True):
 			pokefound.acquire(1)
-			if found == True:
+			if found != None:
 				pokefound.release()
 				break
 			pokefound.release()
@@ -250,6 +260,7 @@ class Player:
 			right_interval = random.randrange(10,35)
 			holdKey(driver, pokefound, (offset + right_interval) / 100, "A")
 			offset = right_interval
+		print("Going to catch a Level", found[1], found[0], "that I", ("have" if found[2] else "havent"), "caught before!")
 
 	#Necessary for fighting/catching pokemon, all damage is calculated from this information
 	def init_team(self):
@@ -258,7 +269,7 @@ class Player:
 		raw_data = cards_group.text.split('\n')
 		info = [raw_data[x:x+9] for x in range(0, len(raw_data), 9)]
 		for i in range(len(info)):
-			self.pokemons.append(Pokemon(info[i][0], info[i][1], "", info[i][5:9]))
+			self.pokemons.append(Pokemon(info[i][0], info[i][1], "", info[i][5:9], i))
 
 	def gyms(self, only_unobtained=True):
 		GYM_BASE_URL = "https://www.pokemon-vortex.com/battle-gym/"
@@ -284,44 +295,10 @@ class Player:
 			quit()
 		for gym in todo:
 			driver.get(GYM_BASE_URL + gym)
-			while self.fight(Trainer(), 10) != True:
+			battle = Battle(self.pokemons, Trainer())
+			while battle.fight(10) != True:
 				driver.get(GYM_BASE_URL + gym)
 		print("You have beaten all the (remaining) gyms!")
-
-	#Completes a 'fight', fight is classified as 6 allies and 1-6 enemies
-	#If the hp of the last enemy has reached the target (defined by the FightType) the function will return True
-	#If all allies have died and the enemy hasn't reached it's target, the function will return False
-	def fight(self, fighttype, minimum_duration=0):
-		battle = Battle(self.pokemons, fighttype)
-		minimum_endtime = time.time() + minimum_duration
-		for count, enemy in enumerate(battle.enemies):
-			if enemy.name == "":
-				return True
-			for _ in range(len(self.pokemons)):
-				pokeslot, moveset = battle.ally_pokemon_choice(self.pokemons, enemy, battle.fighttype.target_range)
-				if pokeslot == -1:
-					print("No valid option could be found")
-					return False
-				print("Pokeslot:", pokeslot + 1)
-				print(moveset)
-				battle.fighttype.select_ally(pokeslot)
-				for move in moveset:
-					while True:
-						if battle.attack(enemy, pokeslot, move) == True or battle.allies[pokeslot].hp == 0:
-							break
-					if battle.allies[pokeslot].hp <= 0 or hp_reached_target(enemy.hp, battle.fighttype.target_range):
-						finish_loading()
-						if hp_reached_target(enemy.hp, battle.fighttype.target_range) and is_last_enemy(count, battle.enemies):
-							while time.time() < minimum_endtime:
-								time.sleep(0.3)
-							battle.continue_button()
-							return True
-						battle.continue_button()
-						finish_loading()
-						break
-				if hp_reached_target(enemy.hp, battle.fighttype.target_range):
-					break
-		return False
 
 	def sidequest_loop(self):
 		sidequest_count = 0
@@ -356,11 +333,28 @@ class Player:
 			return False
 		except:
 			pass
-		return self.fight(Trainer(), 10)
+		battle = Battle(self.pokemons, Trainer())
+		return battle.fight(10)
 
 	def catch(self):
+		if driver.current_url != "https://www.pokemon-vortex.com/map/live":
+			return print("Cant run 'catch' when you're not on the map!") #throw exception??
+		if found == None and evaluate_pokemon_info(Lock(), Lock(), [""]) == False:
+			return print("No pokemon was found, run 'gotta_catch_em_all' first")
 		driver.find_element(by=By.TAG_NAME, value="body").send_keys(Keys.SPACE)
-		self.fight(WildEncounter())
+		level = found[1]
+		if level < 15:
+			max_hp = 10
+		elif level < 30:
+			max_hp = 20
+		else:
+			max_hp = 30
+		battle = Battle(self.pokemons, WildEncounter((1,max_hp)))
+		if battle.fight() == False:
+			return print("Failed to lower the pokemon enough to capture it")
+#		if battle.catch() == False:
+#			print("Failed to catch the wild pokemon")
+		#if "The wild Pokémon has been caught." in //*[@id="battleForm"]/div/div/strong[2].text:
 
 #Class that defines a way of interacting with the UI for a given scenario, and also provides a target_range used to work out a desired moveset
 class FightType:
@@ -369,8 +363,8 @@ class FightType:
 
 #Used for lowering pokemon to catch them
 class WildEncounter(FightType):
-	def __init__(self):
-		super().__init__((1, 30))
+	def __init__(self, target_range=(1,30)):
+		super().__init__(target_range)
 
 	def select_ally(self, pokeslot):
 		row, col = divmod(pokeslot, 3)
@@ -383,7 +377,8 @@ class WildEncounter(FightType):
 		finish_loading()
 		locateElement(driver, By.XPATH, "//label[contains(., '" + move + "')]").click()
 		finish_loading()
-		locateElement(driver, By.XPATH, '//*[@id="battleForm"]/div/input[10]').submit()
+		locateElement(driver, By.XPATH, '//*[@id="battleForm"]/div/input[@type="submit"]').submit()
+#		locateElement(driver, By.XPATH, '//*[@id="battleForm"]/div/input[10]').submit()
 		finish_loading()
 
 	def update_hp(self, enemy, ally):
@@ -418,39 +413,88 @@ class Trainer(FightType):
 
 #Holds the data needed for a battle, enemies and hp primarily.
 class Battle:
+	#initialize enemy hp and ally hp
 	def __init__(self, allies, FightType):
 		self.allies = allies
-		self.enemies = [Pokemon()] * 6
 		self.fighttype = FightType
+		self.current_ally = None
+		self.enemies = []
+		self.target_range = FightType.target_range
 		#init enemies
 		raw_data = locateElement(driver, By.ID, "opponentPoke").text.split('\n')
 		info = [raw_data[i:i+3] for i in range (0, len(raw_data), 3)]
 		for i in range(len(info)):
-			self.enemies[i] = Pokemon(info[i][0], info[i][1], info[i][2])
+			self.enemies.append(Pokemon(info[i][0], info[i][1], info[i][2], [], i))
 		#init allies
 		raw_data = driver.find_element(by=By.ID, value="pokeChoose").text.split('\n')
 		info = [raw_data[i:i+3] for i in range (0, len(raw_data), 3)]
 		for i, pokemon in enumerate(self.allies):
+			pokemon.level = int(info[i][1].split(' ')[-1])
 			pokemon.hp = int(info[i][2].split(' ')[-1])
+		self.current_enemy = 0
 
 	def continue_button(self):
 		self.fighttype.continue_button()
+	def select_ally(self):
+		self.fighttype.select_ally(self.current_ally.slot)
+	def last_enemy(self):
+		return True if self.current_enemy + 1 == len(self.enemies) else False
+
+	#Completes a 'fight', fight is classified as 6 allies and 1-6 enemies
+	#If the hp of the last enemy has reached the target (defined by the FightType) the function will return True
+	#If all allies have died and the enemy hasn't reached it's target, the function will return False
+	def fight(self, minimum_duration=0):
+		minimum_endtime = time.time() + minimum_duration
+		while self.current_enemy < len(self.enemies):
+			enemy = self.enemies[self.current_enemy]
+			for _ in range(len(self.allies)):
+				moveset = self.ally_pokemon_choice(enemy)
+				if not self.current_ally:
+					print("No valid option could be found")
+					return False
+#				print("Current ally:", self.current_ally.name, "slot:", self.current_ally.slot)
+#				print(moveset)
+				self.select_ally()
+				for move in moveset:
+					while True:
+						if self.attack(move) == True or self.current_ally.dead():
+							break
+					if self.current_ally.dead() or enemy.hp_in_range(self.target_range):
+						finish_loading()
+						if enemy.hp_in_range(self.target_range) and self.last_enemy():
+							while time.time() < minimum_endtime:
+								time.sleep(0.3)
+							self.continue_button()
+							return True
+						self.continue_button()
+						finish_loading()
+						break
+				if enemy.hp_in_range(self.target_range):
+					self.current_enemy += 1
+					break
+		return False
 
 	#bug: if enemy is burned/taking DOT, this will return True, causing the battle to time out
-	def attack(self, enemy, pokeslot, move):
+	#ditto is still going to break my new system for the first move
+	def attack(self, move):
+		enemy = self.enemies[self.current_enemy]
 		hp_before = enemy.hp
 		self.fighttype.attack(move)
-		self.fighttype.update_hp(enemy, self.allies[pokeslot])
-		return True if hp_before != enemy.hp else False
+		self.fighttype.update_hp(enemy, self.current_ally)
+#		print("Damage of current move:", self.current_ally.moves[move].damage)
+#		print("HP before:", hp_before, "HP after:", enemy.hp, "difference:", hp_before - enemy.hp)
+		return True if (enemy.hp == 0 or hp_before - enemy.hp >= self.current_ally.moves[move].damage) else False
 
-	def ally_pokemon_choice(self,allies, enemy, target_range):
-		simulation = [[] for _ in range(len(allies))]
-		for i, pokemon in enumerate(allies):
+	#update_current_ally
+	def ally_pokemon_choice(self, enemy):
+		simulation = [[] for _ in range(len(self.allies))]
+		for i, pokemon in enumerate(self.allies):
 			if pokemon.hp <= 0:
 				continue
-			move_dmg = get_moves_finaldmg(pokemon, enemy)
-			simulate_scenarios(simulation[i], copy.deepcopy(enemy), pokemon, move_dmg, target_range)
-		best_pokemon = -1
+#			move_dmg = get_moves_finaldmg(pokemon, enemy)
+			pokemon.set_movesdmg(enemy)
+			simulate_scenarios(simulation[i], copy.deepcopy(enemy), pokemon, self.target_range)
+		best_pokemon = None
 		best_scenario = None
 		for i, simulate in enumerate(simulation):
 			if not simulate:
@@ -459,13 +503,15 @@ class Battle:
 				if best_scenario == None or len(best_scenario) > len(scenario):
 					best_scenario = scenario
 					best_pokemon = i
-		return (best_pokemon, best_scenario)
+		self.current_ally = self.allies[best_pokemon]
+		return (best_scenario)
 
 class Pokemon:
-	def __init__(self, name="", level="", hp="", moves=[]):
+	def __init__(self, name="", level="", hp="", moves=[], slot=0):
 		self.special = ""
 		self.moves = dict()
 		self.types = []
+		self.slot = slot
 		if not name:
 			self.name = ""
 		else:
@@ -476,32 +522,49 @@ class Pokemon:
 			else:
 				self.name = " ".join(fullname)
 			self.types = pokedb[self.name].types
-		if not level:
-			self.level = 0
-		else:
-			self.level = int(level.split(' ')[-1])
-		if not hp:
-			self.hp = -1
-		else:
-			self.hp = int(hp.split(' ')[-1])
+		self.level = 0 if not level else int(level.split(' ')[-1])
+		self.hp = -1 if not hp else int(hp.split(' ')[-1])
 		if moves:
 			for move in moves:
-				move_name = move
-				self.moves[move_name] = Move(move_name)
-			for move in self.moves:
-				same_type_attack_bonus = 1.5 if self.moves[move].type in self.types else 1
-				self.moves[move].raw_damage = self.level * self.moves[move].power * same_type_attack_bonus
-				if self.special == "Dark":
-					self.moves[move].raw_damage *= 1.25
+				self.moves[move] = Move(move, self)
+			# for move in self.moves:
+			# 	same_type_attack_bonus = 1.5 if self.moves[move].type in self.types else 1
+			# 	self.moves[move].raw_damage = self.level * self.moves[move].power * same_type_attack_bonus
+			# 	if self.special == "Dark":
+			# 		self.moves[move].raw_damage *= 1.25
+
+	def dead(self):
+		return True if self.hp <= 0 else False
+	def hp_in_range(self, range):
+		return True if self.hp >= range[0] and self.hp <= range[1] else False
+	def set_movesdmg(self, enemy):
+		for move in self.moves:
+			self.moves[move].set_damage(enemy)
 
 class Move:
-	def __init__(self, name = ""):
+	def __init__(self, name = "", pokemon = None):
 		self.name = name
 		self.type = ""
 		self.power = 0
-		self.damage = None
+		self.basedmg = 0
+		self.damage = 0
 		if name != "":
 			self.type, self.power = move_library[name]
+		if pokemon != None:
+			self.basedmg = pokemon.level * self.power * (1.5 if self.type in pokemon.types else 1) * (1.25 if pokemon.special == "Dark" else 1)
+#			print(self.name, "=", pokemon.level, self.power, "(", self.type, pokemon.types, ")", pokemon.special)
+#			print(self.basedmg)
+
+	def get_multiplier(self, enemy_types):
+		mult = 1
+		for enemy_type in enemy_types:
+			if multipliers[self.type][enemy_type] == 0:
+				return 0
+			mult *= multipliers[self.type][enemy_type]
+		return mult
+
+	def set_damage(self, enemy):
+		self.damage = int((self.basedmg * self.get_multiplier(enemy.types) * (0.75 if enemy.special == "Metallic" else 1)) / 60)
 
 #---------------------------------------MAIN----------------------------------------
 

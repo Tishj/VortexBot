@@ -5,6 +5,9 @@ player:
 
 #List of full names, names and/or types the pokemon-catcher stops on
 desired_pokemon:
+  - "" #uncomment the start of this line to catch any pokemon you encounter
+  - Magmar
+  - Shiny
   - Shiny Charmander
   - Shadow Charmander
   - Articuno
@@ -100,6 +103,10 @@ desired_pokemon:
 # - Dark
 # - Mystic
 # - Metallic
+#Catch any pokemon with a level that falls between min-max (inclusive)
+level_range:
+  min: 0
+  max: 100
 
 #Determines what the bot will do, current supported options are:
 #catch - Walk from left to right until a name from desired_pokemon has been found
@@ -108,3 +115,9 @@ desired_pokemon:
 #clanbattle - Similar to sidequests, will continue fighting in clanbattles until stopped
 
 mode: sidequest
+
+#Optional additional criteria for mode 'catch':
+
+#If set to 'true', will catch only pokemon that meet the other criteria and haven't been caught yet
+#(pair with desired_pokemon "" to catch any pokemon you haven't caught yet)
+only_unobtained: true
