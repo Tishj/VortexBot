@@ -276,26 +276,24 @@ class Player:
 		password_field.send_keys(password)
 		login_button.send_keys(Keys.RETURN)
 
-	def select_ball_amount(self, ball, amount, total_price):
+	def select_ball_amount(self, ball, amount):
 		types = { 'Poké Ball' : 'poke_ball', 'Great Ball' : 'great_ball', 'Ultra Ball' : 'ultra_ball' }
-		prices = { 'Poké Ball' : 250, 'Great Ball' : 800, 'Ultra Ball' : 1500 }
-		if amount * prices[ball] > self.money:
-			amount = self.money / prices[ball]
-		if amount <= 5:
-			locateElement(driver, By.XPATH, '//*[@id="' + types[ball] + '_calc"]/option[' + str(amount + 1) + ']').click()
-		elif amount <= 10:
-			amount = 10
-			locateElement(driver, By.XPATH, '//*[@id="' + types[ball] + '_calc"]/option[' + str(7) + ']').click()
-		elif amount <= 25:
-			amount = 25
-			locateElement(driver, By.XPATH, '//*[@id="' + types[ball] + '_calc"]/option[' + str(8) + ']').click()
-		elif amount <= 50:
-			amount = 50
-			locateElement(driver, By.XPATH, '//*[@id="' + types[ball] + '_calc"]/option[' + str(9) + ']').click()
-		elif amount <= 100:
+
+		if amount >= 100:
 			amount = 100
 			locateElement(driver, By.XPATH, '//*[@id="' + types[ball] + '_calc"]/option[' + str(10) + ']').click()
-		return (amount, prices[ball] * amount);
+		elif amount >= 50:
+			amount = 50
+			locateElement(driver, By.XPATH, '//*[@id="' + types[ball] + '_calc"]/option[' + str(9) + ']').click()
+		elif amount >= 25:
+			amount = 25
+			locateElement(driver, By.XPATH, '//*[@id="' + types[ball] + '_calc"]/option[' + str(8) + ']').click()
+		elif amount >= 10:
+			amount = 10
+			locateElement(driver, By.XPATH, '//*[@id="' + types[ball] + '_calc"]/option[' + str(7) + ']').click()
+		elif amount <= 5:
+			locateElement(driver, By.XPATH, '//*[@id="' + types[ball] + '_calc"]/option[' + str(amount + 1) + ']').click()
+		return amount
 
 	#check if we have enough money to buy the pokeballs
 	def restock(self):
@@ -305,21 +303,28 @@ class Player:
 		self.money = int(locateElement(driver, By.XPATH, '//*[@id="yourCash"]').text.replace('You Have: ', '').replace(',', ''))
 
 		balltypes = { 'Poké Ball' : '2', 'Great Ball' : '3', 'Ultra Ball' : '4' }
-		balls_purchased = False
+		prices = { 'Poké Ball' : 250, 'Great Ball' : 800, 'Ultra Ball' : 1500 }
 
-		for ball in balltypes:
-			if self.items[ball] == None:
-				self.items[ball] = int(locateElement(driver, By.XPATH, '//*[@id="items-content-balls"]/tbody/tr[' + balltypes[ball] + ']/td[4]').text)
-#			print(ball, "amount:", self.items[ball], "restock:", config['restock'][ball])
-			if self.items[ball] < config['restock'][ball]['min']:
-				amount, price = self.select_ball_amount(ball, config['restock'][ball]['goal'] - self.items[ball], total_price)
-				self.items[ball] += amount
-				total_price += price
-				balls_purchased = True
+		while True:
+			balls_purchased = False
+			for ball in balltypes:
+				if self.items[ball] == None:
+					self.items[ball] = int(locateElement(driver, By.XPATH, '//*[@id="items-content-balls"]/tbody/tr[' + balltypes[ball] + ']/td[4]').text)
+	#			print(ball, "amount:", self.items[ball], "restock:", config['restock'][ball])
+				difference = config['restock'][ball]['goal'] - self.items[ball]
+				if difference > 0 and total_price + (difference * prices[ball]) > self.money:
+					print("You broke, fix it")
+					quit()
+				if self.items[ball] < config['restock'][ball]['goal']:
+					amount = self.select_ball_amount(ball, difference)
+					self.items[ball] += amount
+					total_price += amount * prices[ball]
+					balls_purchased = True
 
-		if balls_purchased:
-			locateElement(driver, By.XPATH, '//*[@id="checkoutButton"]').click()
-
+			if balls_purchased:
+				locateElement(driver, By.XPATH, '//*[@id="checkoutButton"]').click()
+			else:
+				break ;
 
 	#Running this will reset your sidequest progress, happens automatically at 2121 (the final sidequest at the time of writing)
 	def reset_sidequests(self):
@@ -808,7 +813,7 @@ player = Player()
 player.login()
 player.init_team()
 player.init_inv()
-player.restock()
+# player.restock()
 
 if config['mode'] == "catch":
 	while True:
