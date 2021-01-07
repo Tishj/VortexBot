@@ -27,6 +27,7 @@ import yaml
 sidequest_number = 0
 last_battle_won = time.time() - 10
 
+#load config
 try:
 	with open('config.yml', 'r') as f:
 		config = yaml.load(f)
@@ -48,8 +49,8 @@ except:
 #Variables used by the pokemon catching/finding functions
 criteria = dict()
 try:
-	criteria['names'] = config['desired_pokemon']
-	if criteria['names'] == []:
+	criteria['pokemon'] = config['pokemon']
+	if not criteria['pokemon']:
 		raise Exception("Desired pokemon list empty")
 except:
 	print("Desired pokemon list is missing or empty")
@@ -61,14 +62,7 @@ except:
 		print("Mode missing")
 		quit()
 
-try:
-	criteria['levelselect'] = config['level_range']
-	if not criteria['levelselect'].has_key('min'):
-		criteria['levelselect']['min'] = 0
-	if not criteria['levelselect'].has_key('max'):
-		criteria['levelselect']['max'] = 100
-except:
-	criteria['levelselect'] = { 'min' : 0, 'max' : 100 }
+print(criteria['pokemon'])
 
 found = None
 
@@ -130,35 +124,44 @@ def holdKey(driver, pokefound, duration, key):
 		options["autoRepeat"] = True
 		time.sleep(0.01)
 
+def selector_met(selection_group, key, ppty):
+	return True if key not in selection_group or ppty in selection_group[key] else False
+
+def meets_criteria(encounter):
+	global criteria
+	if not criteria['pokemon'][encounter.rarity]:
+		print(encounter.rarity, 'selection groups for this rarity are empty')
+		return True
+	if encounter.rarity not in criteria['pokemon']:
+		print("RARITY '", encounter.rarity, "' missing from config!")
+		quit()
+	for selection_group in criteria['pokemon'][encounter.rarity]:
+		if selector_met(criteria['pokemon'][encounter.rarity][selection_group], 'special', encounter.prefix) and selector_met(criteria['pokemon'][encounter.rarity][selection_group], 'caught', encounter.caught) and selector_met(criteria['pokemon'][encounter.rarity][selection_group], 'name', encounter.name):
+			print(selection_group, 'Requirements met!', 'with \'caught\':', encounter.caught, 'special:', encounter.prefix, 'name:', encounter.name)
+			return True
+	return False
+
 def evaluate_pokemon_info(mutex, pokefound, last_pokemon):
 	if "UID" not in evaluate_pokemon_info.__dict__: evaluate_pokemon_info.UID = None
 	global found
 	global criteria
-#	try:
 	mutex.acquire(1)
 	encounter = driver.execute_script('return Phaser.Display.Canvas.CanvasPool.pool[2].parent.scene.encounterProfile.encounter;')
 	mutex.release()
 	newUID = None if encounter == None else encounter['id']
 	if encounter and newUID and (evaluate_pokemon_info.UID == None or evaluate_pokemon_info.UID != newUID):
-		print('yeet')
 		evaluate_pokemon_info.UID = newUID
-		if encounter['prefix'] != "":
-			pokeName = encounter['prefix'] + " " + encounter['pokemon']['name']
-		else:
-			pokeName = encounter['pokemon']['name']
-		print(pokeName)
-		pokeLvl = encounter['level']
-		print(pokeLvl)
-		pokeCaught = False if encounter['caught'] == 0 else True
-		print(pokeCaught)
-		print(encounter['pokemon']['rarity'])
-#		print('Encounter is not None:', encounter != None)
-		for name in criteria['names']:
-			if name in pokeName and (pokeLvl >= criteria['levelselect']['min'] and pokeLvl <= criteria['levelselect']['max']):
-				pokefound.acquire(1)
-				found = (pokeName, pokeLvl, pokeCaught)
-				pokefound.release()
-				return True
+		pokemon = Encounter()
+		pokemon.name = encounter['pokemon']['name']
+		pokemon.prefix = encounter['prefix']
+		pokemon.level = encounter['level']
+		pokemon.caught = encounter['caught']
+		pokemon.rarity = encounter['pokemon']['rarity']
+		if meets_criteria(pokemon):
+			pokefound.acquire(1)
+			found = pokemon
+			pokefound.release()
+			return True
 	return False
 
 #Get the name of the current encountered pokemon and see if it matches the list of pokemon we're looking to catch
@@ -181,6 +184,7 @@ def get_type_multiplier(dmgtype, enemy_types):
 	return mult
 
 #Based on the enemy, determine the damage each move is going to do against said enemy
+#Might still be fucked, because of dark/metallic mix
 def get_moves_finaldmg(pokemon, enemy):
 	move_dmg = dict()
 	for move in pokemon.moves:
@@ -188,7 +192,7 @@ def get_moves_finaldmg(pokemon, enemy):
 		if enemy.special == "Metallic":
 			move_dmg[move] *= 0.75
 		move_dmg[move] /= 60
-		move_dmg[move] = int(move_dmg[move])
+		move_dmg[move] = int(move_dmg[move] + 0.5)
 	return (move_dmg)
 
 #Recursively checks all combinations of moves to see if they eventually lead to the enemy hp reaching target_range (defined by FightType)
@@ -406,8 +410,11 @@ class Player:
 		player.move('map/live')
 		if found == None and evaluate_pokemon_info(Lock(), Lock(), [""]) == False:
 			return print("No pokemon was found, run 'gotta_catch_em_all' first")
-		print("Going to catch a Level", found[1], found[0], "that I", ("have" if found[2] else "havent"), "caught before!")
-		level = found[1]
+		if found.prefix:
+			print("Going to catch a Level", found.level, found.prefix, found.name, "that I", ("have" if found.caught else "havent"), "caught before!")
+		else:
+			print("Going to catch a Level", found.level, found.name, "that I", ("have" if found.caught else "havent"), "caught before!")
+		level = found.level
 		if level < 15:
 			max_hp = 10
 		elif level < 30:
@@ -418,9 +425,10 @@ class Player:
 			print("ULTRA BEAST FOUND")
 			quit()
 		battle = Battle(self.pokemons, WildEncounter((1,max_hp)))
-		enemy = Pokemon(found[0])
+		enemy = Pokemon(found.name)
+		enemy.special = found.prefix
 		enemy.level = level
-		enemy.hp = level * 4 * (1.25 if "Shiny" in found[0] else 1)
+		enemy.hp = level * 4 * (1.25 if "Shiny" in found.prefix else 1)
 		for ally in battle.allies:
 			ally.hp = ally.level * 4 * (1.25 if "Shiny" in ally.special else 1)
 #		print(enemy.hp)
