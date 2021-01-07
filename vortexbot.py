@@ -62,12 +62,30 @@ except:
 		print("Mode missing")
 		quit()
 
-print(criteria['pokemon'])
-
 found = None
+
+def get_platform():
+	platforms = {
+		'linux1' : 'Linux',
+		'linux2' : 'Linux',
+		'darwin' : 'OS X',
+		'win32' : 'Windows',
+		'linux' : 'Windows'
+	}
+	if sys.platform not in platforms:
+		print("OS not supported!", sys.platform)
+		return sys.platform
+
+	return platforms[sys.platform]
 
 #Selenium set up
 PATH = "./req/chromedriver.exe"
+platform = get_platform()
+if platform == "Windows":
+	PATH = "./req/chromedriver.exe"
+else:
+	PATH = "./req/chromedriver"
+
 desired = DesiredCapabilities.CHROME
 desired['goog:loggingPrefs'] = { 'browser':'ALL' }
 driver = webdriver.Chrome(service=Service(PATH), desired_capabilities=desired)
@@ -134,7 +152,7 @@ def meets_criteria(encounter):
 		return True
 	if encounter.rarity not in criteria['pokemon']:
 		print("RARITY '", encounter.rarity, "' missing from config!")
-		quit()
+		os._exit(1)
 	for selection_group in criteria['pokemon'][encounter.rarity]:
 		if selector_met(criteria['pokemon'][encounter.rarity][selection_group], 'special', encounter.prefix) and selector_met(criteria['pokemon'][encounter.rarity][selection_group], 'caught', encounter.caught) and selector_met(criteria['pokemon'][encounter.rarity][selection_group], 'name', encounter.name):
 			print(selection_group, 'Requirements met!', 'with \'caught\':', encounter.caught, 'special:', encounter.prefix, 'name:', encounter.name)
@@ -199,7 +217,7 @@ def get_moves_finaldmg(pokemon, enemy):
 def simulate_scenarios(destination, enemy, pokemon, target_range, history=[]):
 	if enemy.hp >= target_range[0] and enemy.hp <= target_range[1]:
 		return destination.append(history)
-	if enemy.hp <= 0 or (history and len(history) >= 8):
+	if enemy.hp <= 0 or (history and len(history) >= 4):
 		return
 	for move in pokemon.moves:
 		new_enemy = copy.deepcopy(enemy)
@@ -230,6 +248,7 @@ class Player:
 	def __init__(self):
 		self.pokemons = []
 		self.items = { 'Poké Ball' : None, 'Great Ball' : None, 'Ultra Ball' : None }
+		self.money = 0
 
 	def move(self, location):
 		BASE_URL = "https://www.pokemon-vortex.com/"
@@ -257,24 +276,33 @@ class Player:
 		password_field.send_keys(password)
 		login_button.send_keys(Keys.RETURN)
 
-	def select_ball_amount(self, ball, amount):
+	def select_ball_amount(self, ball, amount, total_price):
 		types = { 'Poké Ball' : 'poke_ball', 'Great Ball' : 'great_ball', 'Ultra Ball' : 'ultra_ball' }
+		prices = { 'Poké Ball' : 250, 'Great Ball' : 800, 'Ultra Ball' : 1500 }
+		if amount * prices[ball] > self.money:
+			amount = self.money / prices[ball]
 		if amount <= 5:
 			locateElement(driver, By.XPATH, '//*[@id="' + types[ball] + '_calc"]/option[' + str(amount + 1) + ']').click()
 		elif amount <= 10:
+			amount = 10
 			locateElement(driver, By.XPATH, '//*[@id="' + types[ball] + '_calc"]/option[' + str(7) + ']').click()
 		elif amount <= 25:
+			amount = 25
 			locateElement(driver, By.XPATH, '//*[@id="' + types[ball] + '_calc"]/option[' + str(8) + ']').click()
 		elif amount <= 50:
+			amount = 50
 			locateElement(driver, By.XPATH, '//*[@id="' + types[ball] + '_calc"]/option[' + str(9) + ']').click()
 		elif amount <= 100:
+			amount = 100
 			locateElement(driver, By.XPATH, '//*[@id="' + types[ball] + '_calc"]/option[' + str(10) + ']').click()
-		return amount;
+		return (amount, prices[ball] * amount);
 
 	#check if we have enough money to buy the pokeballs
 	def restock(self):
 		driver.get('https://www.pokemon-vortex.com/pokemart/')
 		locateElement(driver, By.XPATH, '//*[@id="items-header-balls"]').click()
+		total_price = 0
+		self.money = int(locateElement(driver, By.XPATH, '//*[@id="yourCash"]').text.replace('You Have: ', '').replace(',', ''))
 
 		balltypes = { 'Poké Ball' : '2', 'Great Ball' : '3', 'Ultra Ball' : '4' }
 		balls_purchased = False
@@ -282,9 +310,11 @@ class Player:
 		for ball in balltypes:
 			if self.items[ball] == None:
 				self.items[ball] = int(locateElement(driver, By.XPATH, '//*[@id="items-content-balls"]/tbody/tr[' + balltypes[ball] + ']/td[4]').text)
-#			print(ball, "amount:", self.items[ball], "threshold:", config['threshold'][ball])
-			if self.items[ball] < config['threshold'][ball]:
-				self.items[ball] += self.select_ball_amount(ball, config['threshold'][ball] - self.items[ball])
+#			print(ball, "amount:", self.items[ball], "restock:", config['restock'][ball])
+			if self.items[ball] < config['restock'][ball]['min']:
+				amount, price = self.select_ball_amount(ball, config['restock'][ball]['goal'] - self.items[ball], total_price)
+				self.items[ball] += amount
+				total_price += price
 				balls_purchased = True
 
 		if balls_purchased:
@@ -334,6 +364,15 @@ class Player:
 		info = [raw_data[x:x+9] for x in range(0, len(raw_data), 9)]
 		for i in range(len(info)):
 			self.pokemons.append(Pokemon(info[i][0], info[i][1], "", info[i][5:9], i))
+
+	def init_inv(self):
+		self.move('inventory')
+		locateElement(driver, By.XPATH, '//*[@id="ajax"]/ul/li[2]').click()
+		self.items['Poké Ball'] = int(locateElement(driver, By.XPATH, '//*[@id="ajax"]/table/tbody/tr[2]/td[4]').text.split(' ')[0])
+		self.items['Great Ball'] = int(locateElement(driver, By.XPATH, '//*[@id="ajax"]/table/tbody/tr[3]/td[4]').text.split(' ')[0])
+		self.items['Ultra Ball'] = int(locateElement(driver, By.XPATH, '//*[@id="ajax"]/table/tbody/tr[4]/td[4]').text.split(' ')[0])
+		self.items['Master Ball'] = int(locateElement(driver, By.XPATH, '//*[@id="ajax"]/table/tbody/tr[9]/td[4]').text.split(' ')[0])
+		self.items['Beast Ball'] = int(locateElement(driver, By.XPATH, '//*[@id="ajax"]/table/tbody/tr[11]/td[4]').text.split(' ')[0])
 
 	def gyms(self, only_unobtained=True):
 		GYM_BASE_URL = "https://www.pokemon-vortex.com/battle-gym/"
@@ -419,10 +458,12 @@ class Player:
 			max_hp = 10
 		elif level < 30:
 			max_hp = 20
-		else:
+		elif level < 75:
 			max_hp = 30
-		if level >= 75:
-			print("ULTRA BEAST FOUND")
+		else:
+			max_hp = 800
+		if level >= 75 and self.items['Beast Ball'] == 0:
+			print("No way to catch ultra beast, exiting!")
 			quit()
 		battle = Battle(self.pokemons, WildEncounter((1,max_hp)))
 		enemy = Pokemon(found.name)
@@ -431,7 +472,6 @@ class Player:
 		enemy.hp = level * 4 * (1.25 if "Shiny" in found.prefix else 1)
 		for ally in battle.allies:
 			ally.hp = ally.level * 4 * (1.25 if "Shiny" in ally.special else 1)
-#		print(enemy.hp)
 		battle.fighttype.get_moveset(battle, enemy)
 		if battle.current_ally == None:
 			print("Current team has no way of lowering the enemy to fall within:", battle.target_range[0], "and", battle.target_range[1])
@@ -440,10 +480,7 @@ class Player:
 		driver.find_element(by=By.TAG_NAME, value="body").send_keys(Keys.SPACE)
 		time.sleep(2) #remove somehow
 		battle.init_hp()
-#		print(battle.enemies[0].hp)
 		if battle.fight() == False:
-#			print("fuck me")
-#			quit()
 			return print("Failed to lower the pokemon enough to capture it")
 		finish_loading()
 #		battle.fighttype.continue_button()
@@ -452,7 +489,6 @@ class Player:
 		else:
 			print("Succesfully captured!")
 		found = None
-		#if "The wild Pokémon has been caught." in //*[@id="battleForm"]/div/div/strong[2].text:
 
 #Class that defines a way of interacting with the UI for a given scenario, and also provides a target_range used to work out a desired moveset
 class FightType:
@@ -585,7 +621,7 @@ class Battle:
 		return True if self.current_enemy + 1 == len(self.enemies) else False
 
 	def throw(self, pokeballs, ball):
-		options = { 'Poké Ball' : 'Pokéball', 'Great Ball' : 'Great Ball', 'Ultra Ball' : 'Ultra Ball' }
+		options = { 'Poké Ball' : 'Pokéball', 'Great Ball' : 'Great Ball', 'Ultra Ball' : 'Ultra Ball', 'Beast Ball' : 'Beast Ball' }
 		locateElement(driver, By.XPATH, '//label[contains(., "' + options[ball] + '")]').click()
 		pokeballs[ball] -= 1
 		locateElement(driver, By.XPATH, '//*[@id="itemForm"]/table/tbody/tr[20]/td/input[3]').submit()
@@ -597,7 +633,9 @@ class Battle:
 		for _ in range(len([x for x in self.allies if not x.dead()])):
 			while not self.current_ally.dead():
 				pokeball = None
-				if enemy.hp <= 10 and pokeballs['Poké Ball'] != 0:
+				if enemy.level >= 75:
+					pokeball = 'Beast Ball'
+				elif enemy.hp <= 10 and pokeballs['Poké Ball'] != 0:
 					pokeball = 'Poké Ball'
 				elif enemy.hp <= 20 and pokeballs['Great Ball'] != 0:
 					pokeball = 'Great Ball'
@@ -677,7 +715,11 @@ class Battle:
 		self.fighttype.update_hp(enemy, self.current_ally)
 #		print("Damage of current move:", self.current_ally.moves[move].damage)
 #		print("HP before:", hp_before, "HP after:", enemy.hp, "difference:", hp_before - enemy.hp)
-		return True if (enemy.hp == 0 or hp_before - enemy.hp >= self.current_ally.moves[move].damage) else False
+		if hp_before == enemy.hp:
+			if self.target_range[0] == 1:
+				self.continue_button()
+			return False
+		return True if (enemy.dead() or hp_before - enemy.hp >= self.current_ally.moves[move].damage) else False
 
 	#update_current_ally
 	def ally_pokemon_choice(self, enemy):
@@ -765,11 +807,12 @@ class Move:
 player = Player()
 player.login()
 player.init_team()
+player.init_inv()
 player.restock()
 
 if config['mode'] == "catch":
 	while True:
-		if any (player.items[ball] == None or player.items[ball] < config['threshold'][ball] for ball in ['Poké Ball', 'Great Ball', 'Ultra Ball']):
+		if any (player.items[ball] == None or player.items[ball] < config['restock'][ball]['min'] for ball in ['Poké Ball', 'Great Ball', 'Ultra Ball']):
 			player.restock()
 		player.gotta_catch_em_all()
 		player.catch()

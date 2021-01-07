@@ -22,20 +22,28 @@ player:
 
 pokemon:
   COMMON:
-    case1:
+    not in collection:
         caught:
           - 0
-    case2:
+    i like shinies:
         special:
           - Shiny
   RARE:
   LEGENDARY:
   ULTRA:
 
-
-threshold:
-  Poké Ball: 20
-  Great Ball: 10
-  Ultra Ball: 10
+#Minimum threshold of every normal balltype (poke, great and ultra) is 3
+#Master and Beast arent supported
+#Beast threshold is unused, if UB is encountered with no Beast Balls in inventory, program will exit
+restock:
+  Poké Ball:
+    min: 20
+    goal: 50
+  Great Ball:
+    min: 10
+    goal: 20
+  Ultra Ball:
+    min: 10
+    goal: 20
 
 mode: catch
