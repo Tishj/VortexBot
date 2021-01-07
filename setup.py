@@ -11,5 +11,5 @@ setup(
 	author="Tishj",
 	license='MIT',
 	packages = find_packages(),
-	install_requires = ['selenium==4.0.0.a7', 'requests', 'datetime', 'lxml'],
+	install_requires = ['selenium==4.0.0.a7', 'requests', 'datetime', 'lxml', 'pyyaml', 'trio' ],
 )

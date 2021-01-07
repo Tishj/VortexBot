@@ -8,6 +8,9 @@ from selenium.common.exceptions import StaleElementReferenceException
 from selenium.common.exceptions import TimeoutException
 from selenium.webdriver.chrome.service import Service
 
+from selenium.webdriver.common.desired_capabilities import DesiredCapabilities
+import logging
+
 from selenium.webdriver.common.by import By
 from datetime import datetime
 from enum import Enum
@@ -58,11 +61,22 @@ except:
 		print("Mode missing")
 		quit()
 
+try:
+	criteria['levelselect'] = config['level_range']
+	if not criteria['levelselect'].has_key('min'):
+		criteria['levelselect']['min'] = 0
+	if not criteria['levelselect'].has_key('max'):
+		criteria['levelselect']['max'] = 100
+except:
+	criteria['levelselect'] = { 'min' : 0, 'max' : 100 }
+
 found = None
 
 #Selenium set up
 PATH = "./req/chromedriver.exe"
-driver = webdriver.Chrome(service=Service(PATH))
+desired = DesiredCapabilities.CHROME
+desired['goog:loggingPrefs'] = { 'browser':'ALL' }
+driver = webdriver.Chrome(service=Service(PATH), desired_capabilities=desired)
 
 #-------------------------------FUNCTIONS---------------------------------------------
 
@@ -117,32 +131,34 @@ def holdKey(driver, pokefound, duration, key):
 		time.sleep(0.01)
 
 def evaluate_pokemon_info(mutex, pokefound, last_pokemon):
+	if "UID" not in evaluate_pokemon_info.__dict__: evaluate_pokemon_info.UID = None
 	global found
 	global criteria
-	try:
-		mutex.acquire(1)
-		driver.execute_script('document.querySelector("#logout").text = Phaser.Display.Canvas.CanvasPool.pool[2].parent.scene.encounterProfile.pokeName._text')
-		driver.execute_script('document.querySelector("#battleTab > a").text = Phaser.Display.Canvas.CanvasPool.pool[2].parent.scene.encounterProfile.caughtImg._alpha')
-		driver.execute_script('document.querySelector("#yourAccountTab > a").text = Phaser.Display.Canvas.CanvasPool.pool[2].parent.scene.encounterProfile.pokeLvl._text')
-		pokeName = driver.find_element(by=By.ID, value="logout").get_attribute("text")
-		pokeCaught = bool(int())
-		result = driver.find_element(by=By.XPATH, value='//*[@id="yourAccountTab"]/a').get_attribute('text')
-		pokeLvl = 0 if result == "" else int(result.split(' ')[1])
-		result = driver.find_element(by=By.XPATH, value='//*[@id="battleTab"]/a').get_attribute('text')
-		pokeCaught = bool(int(result)) if pokeLvl != 0 else True
-		mutex.release()
-	except:
-		print("Name checker has encountered a fatal error")
-		os._exit(1)
-#	if criteria.has_key('')
-	if pokeLvl != 0 and pokeName != None and pokeName != last_pokemon:
+#	try:
+	mutex.acquire(1)
+	encounter = driver.execute_script('return Phaser.Display.Canvas.CanvasPool.pool[2].parent.scene.encounterProfile.encounter;')
+	mutex.release()
+	newUID = None if encounter == None else encounter['id']
+	if encounter and newUID and (evaluate_pokemon_info.UID == None or evaluate_pokemon_info.UID != newUID):
+		print('yeet')
+		evaluate_pokemon_info.UID = newUID
+		if encounter['prefix'] != "":
+			pokeName = encounter['prefix'] + " " + encounter['pokemon']['name']
+		else:
+			pokeName = encounter['pokemon']['name']
+		print(pokeName)
+		pokeLvl = encounter['level']
+		print(pokeLvl)
+		pokeCaught = False if encounter['caught'] == 0 else True
+		print(pokeCaught)
+		print(encounter['pokemon']['rarity'])
+#		print('Encounter is not None:', encounter != None)
 		for name in criteria['names']:
-			if name in pokeName:
+			if name in pokeName and (pokeLvl >= criteria['levelselect']['min'] and pokeLvl <= criteria['levelselect']['max']):
 				pokefound.acquire(1)
 				found = (pokeName, pokeLvl, pokeCaught)
 				pokefound.release()
 				return True
-	last_pokemon[0] = pokeName
 	return False
 
 #Get the name of the current encountered pokemon and see if it matches the list of pokemon we're looking to catch
@@ -152,8 +168,8 @@ def check_pokemon_name(mutex, pokefound):
 	while True:
 		if evaluate_pokemon_info(mutex, pokefound, wrapper):
 			return
-		print(wrapper[0])
-		time.sleep(1)
+#		print(wrapper[0])
+		time.sleep(0.5)
 
 #Return the type multiplier based of the move's type and the enemy type(s)
 def get_type_multiplier(dmgtype, enemy_types):
@@ -198,10 +214,18 @@ def simulate_scenarios(destination, enemy, pokemon, target_range, history=[]):
 
 #-----------------------------------CLASSES-----------------------------------------
 
+class Encounter:
+	def __init__(self, prefix=None, name="", rarity="", level=None, caught=None):
+		self.prefix = prefix
+		self.name = name
+		self.rarity = rarity
+		self.level = level
+		self.caught = caught
+
 class Player:
 	def __init__(self):
 		self.pokemons = []
-		self.items = {}
+		self.items = { 'Poké Ball' : None, 'Great Ball' : None, 'Ultra Ball' : None }
 
 	def move(self, location):
 		BASE_URL = "https://www.pokemon-vortex.com/"
@@ -229,6 +253,40 @@ class Player:
 		password_field.send_keys(password)
 		login_button.send_keys(Keys.RETURN)
 
+	def select_ball_amount(self, ball, amount):
+		types = { 'Poké Ball' : 'poke_ball', 'Great Ball' : 'great_ball', 'Ultra Ball' : 'ultra_ball' }
+		if amount <= 5:
+			locateElement(driver, By.XPATH, '//*[@id="' + types[ball] + '_calc"]/option[' + str(amount + 1) + ']').click()
+		elif amount <= 10:
+			locateElement(driver, By.XPATH, '//*[@id="' + types[ball] + '_calc"]/option[' + str(7) + ']').click()
+		elif amount <= 25:
+			locateElement(driver, By.XPATH, '//*[@id="' + types[ball] + '_calc"]/option[' + str(8) + ']').click()
+		elif amount <= 50:
+			locateElement(driver, By.XPATH, '//*[@id="' + types[ball] + '_calc"]/option[' + str(9) + ']').click()
+		elif amount <= 100:
+			locateElement(driver, By.XPATH, '//*[@id="' + types[ball] + '_calc"]/option[' + str(10) + ']').click()
+		return amount;
+
+	#check if we have enough money to buy the pokeballs
+	def restock(self):
+		driver.get('https://www.pokemon-vortex.com/pokemart/')
+		locateElement(driver, By.XPATH, '//*[@id="items-header-balls"]').click()
+
+		balltypes = { 'Poké Ball' : '2', 'Great Ball' : '3', 'Ultra Ball' : '4' }
+		balls_purchased = False
+
+		for ball in balltypes:
+			if self.items[ball] == None:
+				self.items[ball] = int(locateElement(driver, By.XPATH, '//*[@id="items-content-balls"]/tbody/tr[' + balltypes[ball] + ']/td[4]').text)
+#			print(ball, "amount:", self.items[ball], "threshold:", config['threshold'][ball])
+			if self.items[ball] < config['threshold'][ball]:
+				self.items[ball] += self.select_ball_amount(ball, config['threshold'][ball] - self.items[ball])
+				balls_purchased = True
+
+		if balls_purchased:
+			locateElement(driver, By.XPATH, '//*[@id="checkoutButton"]').click()
+
+
 	#Running this will reset your sidequest progress, happens automatically at 2121 (the final sidequest at the time of writing)
 	def reset_sidequests(self):
 		locateElement(driver, By.XPATH, '//*[@id="optionsTab"]').click()
@@ -244,7 +302,7 @@ class Player:
 		found = None
 		mutex = Lock()
 		pokefound = Lock()
-		time.sleep(4)
+		time.sleep(4) #replace when I can reliably wait for the map to finish loading
 		if evaluate_pokemon_info(mutex, pokefound, [""]):
 			return
 		thread = Thread(target=check_pokemon_name, args=(mutex,pokefound,))
@@ -263,7 +321,6 @@ class Player:
 			right_interval = random.randrange(10,35)
 			holdKey(driver, pokefound, (offset + right_interval) / 100, "A")
 			offset = right_interval
-		print("Going to catch a Level", found[1], found[0], "that I", ("have" if found[2] else "havent"), "caught before!")
 
 	#Necessary for fighting/catching pokemon, all damage is calculated from this information
 	def init_team(self):
@@ -341,14 +398,15 @@ class Player:
 		except:
 			pass
 		battle = Battle(self.pokemons, Trainer())
+		battle.init_hp()
 		return battle.fight(10)
 
 	def catch(self):
-		if driver.current_url != "https://www.pokemon-vortex.com/map/live":
-			return print("Cant run 'catch' when you're not on the map!") #throw exception??
+		global found
+		player.move('map/live')
 		if found == None and evaluate_pokemon_info(Lock(), Lock(), [""]) == False:
 			return print("No pokemon was found, run 'gotta_catch_em_all' first")
-		driver.find_element(by=By.TAG_NAME, value="body").send_keys(Keys.SPACE)
+		print("Going to catch a Level", found[1], found[0], "that I", ("have" if found[2] else "havent"), "caught before!")
 		level = found[1]
 		if level < 15:
 			max_hp = 10
@@ -356,11 +414,36 @@ class Player:
 			max_hp = 20
 		else:
 			max_hp = 30
+		if level >= 75:
+			print("ULTRA BEAST FOUND")
+			quit()
 		battle = Battle(self.pokemons, WildEncounter((1,max_hp)))
+		enemy = Pokemon(found[0])
+		enemy.level = level
+		enemy.hp = level * 4 * (1.25 if "Shiny" in found[0] else 1)
+		for ally in battle.allies:
+			ally.hp = ally.level * 4 * (1.25 if "Shiny" in ally.special else 1)
+#		print(enemy.hp)
+		battle.fighttype.get_moveset(battle, enemy)
+		if battle.current_ally == None:
+			print("Current team has no way of lowering the enemy to fall within:", battle.target_range[0], "and", battle.target_range[1])
+			quit()
+			return False
+		driver.find_element(by=By.TAG_NAME, value="body").send_keys(Keys.SPACE)
+		time.sleep(2) #remove somehow
+		battle.init_hp()
+#		print(battle.enemies[0].hp)
 		if battle.fight() == False:
+#			print("fuck me")
+#			quit()
 			return print("Failed to lower the pokemon enough to capture it")
-#		if battle.catch() == False:
-#			print("Failed to catch the wild pokemon")
+		finish_loading()
+#		battle.fighttype.continue_button()
+		if battle.catch(self.items) == False:
+			print("Failed to catch the wild pokemon")
+		else:
+			print("Succesfully captured!")
+		found = None
 		#if "The wild Pokémon has been caught." in //*[@id="battleForm"]/div/div/strong[2].text:
 
 #Class that defines a way of interacting with the UI for a given scenario, and also provides a target_range used to work out a desired moveset
@@ -383,14 +466,19 @@ class WildEncounter(FightType):
 	def attack(self, move):
 		finish_loading()
 		locateElement(driver, By.XPATH, "//label[contains(., '" + move + "')]").click()
+#		print("selected", move)
 		finish_loading()
 		locateElement(driver, By.XPATH, '//*[@id="battleForm"]/div/input[@type="submit"]').submit()
+#		print("clicked submit on", move)
 #		locateElement(driver, By.XPATH, '//*[@id="battleForm"]/div/input[10]').submit()
+#		self.continue_button()
 		finish_loading()
 
 	def update_hp(self, enemy, ally):
+#		print('Before: Enemy hp:', enemy.hp, 'Ally hp:', ally.hp)
 		enemy.hp = int(locateElement(driver, By.XPATH, '//*[@id="battleForm"]/div/table/tbody/tr[1]/td[1]/strong').text.split(' ')[1])
 		ally.hp = int(locateElement(driver, By.XPATH, '//*[@id="battleForm"]/div/table/tbody/tr[2]/td[2]/strong').text.split(' ')[1])
+#		print('After: Enemy hp:', enemy.hp, 'Ally hp:', ally.hp)
 
 	def continue_button(self):
 		locateElement(driver, By.XPATH, '//*[@id="battleForm"]/div/input').submit()
@@ -412,7 +500,10 @@ class WildEncounter(FightType):
 				if best_scenario == None or len(best_scenario) > len(scenario):
 					best_scenario = scenario
 					best_pokemon = i
-		battle.current_ally = battle.allies[best_pokemon]
+		if best_pokemon == None:
+			battle.current_ally = None
+		else:
+			battle.current_ally = battle.allies[best_pokemon]
 		return (best_scenario)
 
 #Used in sidequest battles and other trainer battles, the goal is to kill the enemy pokemon (target_range(-5000, 0))
@@ -447,9 +538,9 @@ class Trainer(FightType):
 					strongest_move = ally.moves[move]
 					battle.current_ally = ally
 				if strongest_move.damage >= enemy.hp:
-					break ;
+					break
 			if strongest_move.damage >= enemy.hp:
-				break ;
+				break
 		if strongest_move == None:
 			return []
 		return [strongest_move.name] * int((enemy.hp / strongest_move.damage) + 1)
@@ -464,6 +555,9 @@ class Battle:
 		self.enemies = []
 		self.target_range = FightType.target_range
 		#init enemies
+		self.current_enemy = 0
+
+	def init_hp(self):
 		raw_data = locateElement(driver, By.ID, "opponentPoke").text.split('\n')
 		info = [raw_data[i:i+3] for i in range (0, len(raw_data), 3)]
 		for i in range(len(info)):
@@ -474,7 +568,6 @@ class Battle:
 		for i, pokemon in enumerate(self.allies):
 			pokemon.level = int(info[i][1].split(' ')[-1])
 			pokemon.hp = int(info[i][2].split(' ')[-1])
-		self.current_enemy = 0
 
 	def continue_button(self):
 		self.fighttype.continue_button()
@@ -483,16 +576,57 @@ class Battle:
 	def last_enemy(self):
 		return True if self.current_enemy + 1 == len(self.enemies) else False
 
+	def throw(self, pokeballs, ball):
+		options = { 'Poké Ball' : 'Pokéball', 'Great Ball' : 'Great Ball', 'Ultra Ball' : 'Ultra Ball' }
+		locateElement(driver, By.XPATH, '//label[contains(., "' + options[ball] + '")]').click()
+		pokeballs[ball] -= 1
+		locateElement(driver, By.XPATH, '//*[@id="itemForm"]/table/tbody/tr[20]/td/input[3]').submit()
+		finish_loading()
+		self.fighttype.update_hp(self.enemies[self.current_enemy], self.current_ally)
+
+	def catch(self, pokeballs):
+		enemy = self.enemies[self.current_enemy]
+		for _ in range(len([x for x in self.allies if not x.dead()])):
+			while not self.current_ally.dead():
+				pokeball = None
+				if enemy.hp <= 10 and pokeballs['Poké Ball'] != 0:
+					pokeball = 'Poké Ball'
+				elif enemy.hp <= 20 and pokeballs['Great Ball'] != 0:
+					pokeball = 'Great Ball'
+				elif pokeballs['Ultra Ball'] != 0:
+					pokeball = 'Ultra Ball'
+				else:
+					print ("No remaining poke balls!")
+					return False
+				self.throw(pokeballs, pokeball)
+				if "The wild Pokémon has been caught." in locateElement(driver, By.XPATH, '//*[@id="battleForm"]/div/div/strong[2]').text:
+					locateElement(driver, By.XPATH, '//*[@id="battleForm"]/div/input').click()
+					finish_loading()
+					return True
+				locateElement(driver, By.XPATH, '//*[@id="battleForm"]/div/input').click()
+				finish_loading()
+			remaining_allies = [x for x in self.allies if not x.dead()]
+			if not remaining_allies:
+				return False
+			self.current_ally = remaining_allies[0]
+			self.select_ally()
+		return False
+
 	#Completes a 'fight', fight is classified as 6 allies and 1-6 enemies
 	#If the hp of the last enemy has reached the target (defined by the FightType) the function will return True
 	#If all allies have died and the enemy hasn't reached it's target, the function will return False
 	def fight(self, minimum_duration=0):
+		if not self.allies:
+			self.init_hp()
 		global last_battle_won
 		while self.current_enemy < len(self.enemies):
 			enemy = self.enemies[self.current_enemy]
-			for _ in range(len([x for x in self.allies if not x.dead()])): #loop over all living allies
-#				moveset = self.ally_pokemon_choice(enemy)
+			remaining_allies = len([x for x in self.allies if not x.dead()])
+			if remaining_allies == 0:
+				return False
+			for _ in range(remaining_allies): #loop over all living allies
 				moveset = self.fighttype.get_moveset(self,enemy)
+#				print(moveset)
 				if not self.current_ally:
 					print("No valid option could be found")
 					return False
@@ -502,18 +636,24 @@ class Battle:
 				for move in moveset:
 					while True:
 						if self.attack(move) == True or self.current_ally.dead():
+#							print("attack hit")
 							break
+#						print("attack missed")
 					if self.current_ally.dead() or enemy.hp_in_range(self.target_range):
-						finish_loading()
+#						finish_loading()
 						if enemy.hp_in_range(self.target_range) and self.last_enemy():
-							while time.time() < last_battle_won + minimum_duration:
-								time.sleep(0.3)
+							while time.time() <= last_battle_won + minimum_duration:
+								time.sleep(0.5)
 							self.continue_button()
+							finish_loading()
 							last_battle_won = time.time()
 							return True
 						self.continue_button()
 						finish_loading()
 						break
+					if self.target_range[0] == 1:
+						self.continue_button() #breaks on sidequest
+						finish_loading() #same
 				if enemy.hp_in_range(self.target_range):
 					self.current_enemy += 1
 					break
@@ -524,6 +664,7 @@ class Battle:
 	def attack(self, move):
 		enemy = self.enemies[self.current_enemy]
 		hp_before = enemy.hp
+#		print("Damage done by", move, '=', self.current_ally.moves[move].damage)
 		self.fighttype.attack(move)
 		self.fighttype.update_hp(enemy, self.current_ally)
 #		print("Damage of current move:", self.current_ally.moves[move].damage)
@@ -609,17 +750,21 @@ class Move:
 		return mult
 
 	def set_damage(self, enemy):
-		self.damage = int((self.basedmg * self.get_multiplier(enemy.types) * (0.75 if enemy.special == "Metallic" else 1)) / 60)
+		self.damage = int((self.basedmg * self.get_multiplier(enemy.types) * (0.75 if enemy.special == "Metallic" else 1) / 60) + 0.5)
 
 #---------------------------------------MAIN----------------------------------------
 
 player = Player()
 player.login()
 player.init_team()
+player.restock()
 
 if config['mode'] == "catch":
-	player.gotta_catch_em_all()
-	player.catch()
+	while True:
+		if any (player.items[ball] == None or player.items[ball] < config['threshold'][ball] for ball in ['Poké Ball', 'Great Ball', 'Ultra Ball']):
+			player.restock()
+		player.gotta_catch_em_all()
+		player.catch()
 elif config['mode'] == "sidequest":
 	player.sidequest_loop()
 elif config['mode'] == "gyms":
