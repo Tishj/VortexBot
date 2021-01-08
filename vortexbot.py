@@ -25,18 +25,20 @@ import yaml
 
 #-------------------------------FUNCTIONS---------------------------------------------
 
-#Uses selenium webdriver to find an element, waiting until at most 'timeout' seconds to find it
-def locateElement(driver, by, value, timeout=10):
-	ignored_exceptions = (NoSuchElementException,StaleElementReferenceException,)
-	wait = WebDriverWait(driver, timeout, ignored_exceptions=ignored_exceptions)
-	return wait.until(ec.visibility_of_element_located((by, value)))
-
 #Waits for the 'loading ..' element to disappear
 def finish_loading():
 	while True:
 		loading_element = driver.find_element(By.XPATH, '//*[@id="loading"]')
 		if "visibility: hidden" in loading_element.get_attribute("style") or loading_element.get_attribute("style") == None:
 			break
+
+#-------------------------------SELENIUM UTILS-----------------------------------------
+
+#Uses selenium webdriver to find an element, waiting until at most 'timeout' seconds to find it
+def locateElement(driver, by, value, timeout=10):
+	ignored_exceptions = (NoSuchElementException,StaleElementReferenceException,)
+	wait = WebDriverWait(driver, timeout, ignored_exceptions=ignored_exceptions)
+	return wait.until(ec.visibility_of_element_located((by, value)))
 
 def dispatchKeyEvent(driver, name, options = {}):
 	options["type"] = name
@@ -74,6 +76,8 @@ def holdKey(driver, pokefound, duration, key):
 		pokefound.release()
 		options["autoRepeat"] = True
 		time.sleep(0.01)
+
+#-----------------------------------------ENCOUNTER EVAL--------------------------------------
 
 def selector_met(selection_group, key, ppty):
 	return True if key not in selection_group or ppty in selection_group[key] else False
@@ -125,26 +129,7 @@ def check_pokemon_name(mutex, pokefound):
 #		print(wrapper[0])
 		time.sleep(0.5)
 
-#Return the type multiplier based of the move's type and the enemy type(s)
-def get_type_multiplier(dmgtype, enemy_types):
-	mult = 1
-	for enemy_type in enemy_types:
-		if multipliers[dmgtype][enemy_type] == 0:
-			return 0
-		mult *= multipliers[dmgtype][enemy_type]
-	return mult
-
-#Based on the enemy, determine the damage each move is going to do against said enemy
-#Might still be fucked, because of dark/metallic mix
-def get_moves_finaldmg(pokemon, enemy):
-	move_dmg = dict()
-	for move in pokemon.moves:
-		move_dmg[move] = pokemon.moves[move].raw_damage * get_type_multiplier(pokemon.moves[move].type, enemy.types)
-		if enemy.special == "Metallic":
-			move_dmg[move] *= 0.75
-		move_dmg[move] /= 60
-		move_dmg[move] = int(move_dmg[move] + 0.5)
-	return (move_dmg)
+#-------------------------------ENCOUNTER_MOVE_CHECKER----------------------------------
 
 #Recursively checks all combinations of moves to see if they eventually lead to the enemy hp reaching target_range (defined by FightType)
 def simulate_scenarios(destination, enemy, pokemon, target_range, history=[]):
@@ -180,7 +165,7 @@ class Encounter:
 class Player:
 	def __init__(self):
 		self.pokemons = []
-		self.items = { 'Poké Ball' : None, 'Great Ball' : None, 'Ultra Ball' : None }
+		self.items = dict()
 		self.money = 0
 
 	def move(self, location):
@@ -416,13 +401,11 @@ class Player:
 			quit()
 			return False
 		driver.find_element(by=By.TAG_NAME, value="body").send_keys(Keys.SPACE)
-#		time.sleep(2) #remove somehow
 		battle.init_hp()
 		if enemy.level < 75:
 			if battle.fight() == False:
 				return print("Failed to lower the pokemon enough to capture it")
 			finish_loading()
-#		battle.fighttype.continue_button()
 		if battle.catch(self.items) == False:
 			print("Failed to catch the wild pokemon")
 		else:
@@ -449,19 +432,13 @@ class WildEncounter(FightType):
 	def attack(self, move):
 		finish_loading()
 		locateElement(driver, By.XPATH, "//label[contains(., '" + move + "')]").click()
-#		print("selected", move)
 		finish_loading()
 		locateElement(driver, By.XPATH, '//*[@id="battleForm"]/div/input[@type="submit"]').submit()
-#		print("clicked submit on", move)
-#		locateElement(driver, By.XPATH, '//*[@id="battleForm"]/div/input[10]').submit()
-#		self.continue_button()
 		finish_loading()
 
 	def update_hp(self, enemy, ally):
-#		print('Before: Enemy hp:', enemy.hp, 'Ally hp:', ally.hp)
 		enemy.hp = int(locateElement(driver, By.XPATH, '//*[@id="battleForm"]/div/table/tbody/tr[1]/td[1]/strong').text.split(' ')[1])
 		ally.hp = int(locateElement(driver, By.XPATH, '//*[@id="battleForm"]/div/table/tbody/tr[2]/td[2]/strong').text.split(' ')[1])
-#		print('After: Enemy hp:', enemy.hp, 'Ally hp:', ally.hp)
 
 	def continue_button(self):
 		locateElement(driver, By.XPATH, '//*[@id="battleForm"]/div/input').submit()
@@ -471,7 +448,6 @@ class WildEncounter(FightType):
 		for i, pokemon in enumerate(battle.allies):
 			if pokemon.hp <= 0:
 				continue
-#			move_dmg = get_moves_finaldmg(pokemon, enemy)
 			pokemon.set_movesdmg(enemy)
 			simulate_scenarios(simulation[i], copy.deepcopy(enemy), pokemon, battle.target_range)
 		best_pokemon = None
@@ -537,7 +513,6 @@ class Battle:
 		self.current_ally = None
 		self.enemies = []
 		self.target_range = FightType.target_range
-		#init enemies
 		self.current_enemy = 0
 
 	def init_hp(self):
@@ -547,7 +522,6 @@ class Battle:
 		info = [raw_data[i:i+3] for i in range (0, len(raw_data), 3)]
 		for i in range(len(info)):
 			self.enemies.append(Pokemon(info[i][0], info[i][1], info[i][2], [], i))
-		#init allies
 		raw_data = driver.find_element(by=By.ID, value="pokeChoose").text.split('\n')
 		info = [raw_data[i:i+3] for i in range (0, len(raw_data), 3)]
 		for i, pokemon in enumerate(self.allies):
@@ -603,7 +577,7 @@ class Battle:
 
 	#Completes a 'fight', fight is classified as 6 allies and 1-6 enemies
 	#If the hp of the last enemy has reached the target (defined by the FightType) the function will return True
-	#If all allies have died and the enemy hasn't reached it's target, the function will return False
+	#If all allies have died and the enemy hasn't reached its target, the function will return False
 	def fight(self, minimum_duration=0):
 		if not self.allies:
 			self.init_hp()
@@ -613,23 +587,17 @@ class Battle:
 			remaining_allies = len([x for x in self.allies if not x.dead()])
 			if remaining_allies == 0:
 				return False
-			for _ in range(remaining_allies): #loop over all living allies
+			for _ in range(remaining_allies):
 				moveset = self.fighttype.get_moveset(self,enemy)
-#				print(moveset)
 				if not self.current_ally:
 					print("No valid option could be found")
 					return False
-#				print("Current ally:", self.current_ally.name, "slot:", self.current_ally.slot)
-#				print(moveset)
 				self.select_ally()
 				for move in moveset:
 					while True:
 						if self.attack(move) == True or self.current_ally.dead():
-#							print("attack hit")
 							break
-#						print("attack missed")
 					if self.current_ally.dead() or enemy.hp_in_range(self.target_range):
-#						finish_loading()
 						if enemy.hp_in_range(self.target_range) and self.last_enemy():
 							while time.time() <= last_battle_won + minimum_duration:
 								time.sleep(0.5)
@@ -640,7 +608,7 @@ class Battle:
 						self.continue_button()
 						finish_loading()
 						break
-					if self.target_range[0] == 1:
+					if self.target_range[0] == 1: #refactor this at some point
 						self.continue_button() #breaks on sidequest
 						finish_loading() #same
 				if enemy.hp_in_range(self.target_range):
@@ -662,6 +630,8 @@ class Battle:
 			if self.target_range[0] == 1:
 				self.continue_button()
 			return False
+		if hp_before - enemy.hp != self.current_ally.moves[move].damage and abs(hp_before - enemy.hp - self.current_ally.moves[move].damage) == 1:
+			print('Difference between expected damage of', move, 'against', enemy.fullname, 'and actual damage is', hp_before - enemy.hp)
 		return True if (enemy.dead() or hp_before - enemy.hp >= self.current_ally.moves[move].damage) else False
 
 	#update_current_ally
@@ -670,7 +640,6 @@ class Battle:
 		for i, pokemon in enumerate(self.allies):
 			if pokemon.hp <= 0:
 				continue
-#			move_dmg = get_moves_finaldmg(pokemon, enemy)
 			pokemon.set_movesdmg(enemy)
 			simulate_scenarios(simulation[i], copy.deepcopy(enemy), pokemon, self.target_range)
 		best_pokemon = None
@@ -691,26 +660,22 @@ class Pokemon:
 		self.moves = dict()
 		self.types = []
 		self.slot = slot
+		self.fullname = name
 		if not name:
 			self.name = ""
 		else:
-			fullname = name.split(' ')
-			if fullname[0] in ["Metallic","Shiny","Shadow","Mystic","Dark","Pink","Crystal","Ancient"]:
-				self.special = fullname[0]
-				self.name = " ".join(fullname[1:]) 
+			separated_name = name.split(' ')
+			if separated_name[0] in ["Metallic","Shiny","Shadow","Mystic","Dark","Pink","Crystal","Ancient"]:
+				self.special = separated_name[0]
+				self.name = " ".join(separated_name[1:]) 
 			else:
-				self.name = " ".join(fullname)
+				self.name = " ".join(separated_name)
 			self.types = pokedb[self.name].types
 		self.level = 0 if not level else int(level.split(' ')[-1])
 		self.hp = -1 if not hp else int(hp.split(' ')[-1])
 		if moves:
 			for move in moves:
 				self.moves[move] = Move(move, self)
-			# for move in self.moves:
-			# 	same_type_attack_bonus = 1.5 if self.moves[move].type in self.types else 1
-			# 	self.moves[move].raw_damage = self.level * self.moves[move].power * same_type_attack_bonus
-			# 	if self.special == "Dark":
-			# 		self.moves[move].raw_damage *= 1.25
 
 	def dead(self):
 		return True if self.hp <= 0 else False
@@ -730,9 +695,7 @@ class Move:
 		if name != "":
 			self.type, self.power = move_library[name]
 		if pokemon != None:
-			self.basedmg = pokemon.level * self.power * (1.5 if self.type in pokemon.types else 1) * (1.25 if pokemon.special == "Dark" else 1)
-#			print(self.name, "=", pokemon.level, self.power, "(", self.type, pokemon.types, ")", pokemon.special)
-#			print(self.basedmg)
+			self.basedmg = float(pokemon.level * self.power * (1.5 if self.type in pokemon.types else 1) * (1.25 if pokemon.special == "Dark" else 1))
 
 	def get_multiplier(self, enemy_types):
 		mult = 1
@@ -743,7 +706,7 @@ class Move:
 		return mult
 
 	def set_damage(self, enemy):
-		self.damage = int((self.basedmg * self.get_multiplier(enemy.types) * (0.75 if enemy.special == "Metallic" else 1) / 60) + 0.5)
+		self.damage = int((self.basedmg * (0.75 if enemy.special == "Metallic" else 1) * self.get_multiplier(enemy.types) / 60) + 0.5)
 
 #---------------------------------------MAIN----------------------------------------
 
@@ -792,8 +755,9 @@ if __name__ == '__main__':
 		except:
 			print("Mode missing")
 			quit()
-
 	found = None
+
+#--------------------------------------SELENIUM SET UP------------------------------------------------------
 
 	def get_platform():
 		platforms = {
@@ -809,7 +773,6 @@ if __name__ == '__main__':
 
 		return platforms[sys.platform]
 
-	#Selenium set up
 	PATH = "./req/chromedriver.exe"
 	platform = get_platform()
 	if platform == "Windows":
@@ -820,6 +783,8 @@ if __name__ == '__main__':
 	desired = DesiredCapabilities.CHROME
 	desired['goog:loggingPrefs'] = { 'browser':'ALL' }
 	driver = webdriver.Chrome(service=Service(PATH), desired_capabilities=desired)
+
+#-----------------------------------------MAIN-------------------------------------------
 
 	player = Player()
 	player.login(config, driver)
@@ -836,5 +801,5 @@ if __name__ == '__main__':
 		player.sidequest_loop()
 	elif config['mode'] == "gyms":
 		player.gyms()
-#else if config['mode'] == "clanbattle"
-#	player.clanbattle_loop
+	#elif config['mode'] == "clanbattle"
+	#	player.clanbattle_loop
