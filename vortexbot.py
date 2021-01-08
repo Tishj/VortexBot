@@ -8,6 +8,7 @@ from selenium.common.exceptions import StaleElementReferenceException
 from selenium.common.exceptions import TimeoutException
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
+from selenium.webdriver.common.action_chains import ActionChains
 
 from selenium.webdriver.common.desired_capabilities import DesiredCapabilities
 import logging
@@ -79,12 +80,12 @@ def selector_met(selection_group, key, ppty):
 
 def meets_criteria(encounter):
 	global criteria
-	if not criteria['pokemon'][encounter.rarity]:
-#		print(encounter.rarity, 'selection groups for this rarity are empty')
-		return True
 	if encounter.rarity not in criteria['pokemon']:
-		print("RARITY '", encounter.rarity, "' missing from config!")
+		print(encounter.rarity, "category is missing from config!")
 		os._exit(1)
+	if not criteria['pokemon'][encounter.rarity]:
+		print('Selection groups for', encounter.rarity, 'are empty')
+		return True
 	for selection_group in criteria['pokemon'][encounter.rarity]:
 		if selector_met(criteria['pokemon'][encounter.rarity][selection_group], 'special', encounter.prefix) and selector_met(criteria['pokemon'][encounter.rarity][selection_group], 'caught', encounter.caught) and selector_met(criteria['pokemon'][encounter.rarity][selection_group], 'name', encounter.name):
 			print('Requirements met for \'', selection_group, '\' - With \'caught\':', encounter.caught, '\'special\':', encounter.prefix, '\'name\':', encounter.name)
@@ -586,7 +587,8 @@ class Battle:
 					return False
 				self.throw(pokeballs, pokeball)
 				if "The wild Pokémon has been caught." in locateElement(driver, By.XPATH, '//*[@id="battleForm"]/div/div/strong[2]').text:
-					locateElement(driver, By.XPATH, '//*[@id="battleForm"]/div/input').click()
+#					locateElement(driver, By.XPATH, '//*[@id="battleForm"]/div/input').click() #this broke for some reason?
+					locateElement(driver, By.XPATH, '//*[@id="battleForm"]/div/input').submit()
 					finish_loading()
 					time.sleep(0.5)
 					return True
@@ -604,7 +606,7 @@ class Battle:
 	#If all allies have died and the enemy hasn't reached it's target, the function will return False
 	def fight(self, minimum_duration=0):
 		if not self.allies:
-			self.init_hp('')
+			self.init_hp()
 		global last_battle_won
 		while self.current_enemy < len(self.enemies):
 			enemy = self.enemies[self.current_enemy]

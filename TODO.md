@@ -14,3 +14,6 @@ categorize prizes and bids for each pokemon, and based off of that information f
 Calculate how fast the current enemy can kill the current pokemon, dont recurse any further than that
 
 Fix dark on metallic damage calculation error
+
+Keep track of succesrates per RARITY, level, hp and pokeball used
+['LEGENDARY']['65']['10']['Poke Ball'] - percentage capture success
