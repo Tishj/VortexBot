@@ -1,12 +1,12 @@
 # **************************************************************************** #
 #                                                                              #
 #                                                         ::::::::             #
-#    update_movedb2.py                                  :+:    :+:             #
+#    update_movedb.py                                   :+:    :+:             #
 #                                                      +:+                     #
 #    By: tbruinem <tbruinem@student.codam.nl>         +#+                      #
 #                                                    +#+                       #
 #    Created: 2021/01/02 10:56:07 by tbruinem      #+#    #+#                  #
-#    Updated: 2021/01/02 11:19:46 by tbruinem      ########   odam.nl          #
+#    Updated: 2021/01/08 00:07:04 by tbruinem      ########   odam.nl          #
 #                                                                              #
 # **************************************************************************** #
 
@@ -26,6 +26,8 @@ for move in moves:
 		continue
 	print(movename[:-1])
 	movedb[movename[:-1]] = (movetype.attrib['class'], int(power.text))
+
+movedb['Poison Powder'] = ('grass', 0)
 
 with open('movedb', 'wb') as f:
 	pickle.dump(movedb, f, pickle.HIGHEST_PROTOCOL)

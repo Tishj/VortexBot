@@ -7,11 +7,11 @@ from selenium.common.exceptions import NoSuchElementException
 from selenium.common.exceptions import StaleElementReferenceException
 from selenium.common.exceptions import TimeoutException
 from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.common.by import By
 
 from selenium.webdriver.common.desired_capabilities import DesiredCapabilities
 import logging
 
-from selenium.webdriver.common.by import By
 from datetime import datetime
 from enum import Enum
 
@@ -21,74 +21,6 @@ import re
 import pickle
 import copy
 import yaml
-
-#--------------------------------------INCLUDES--------------------------------------
-
-sidequest_number = 0
-last_battle_won = time.time() - 10
-
-#load config
-try:
-	with open('config.yml', 'r') as f:
-		config = yaml.load(f)
-except:
-	print("Your config.yml is either missing or corrupted, please make sure there's a valid config.yml in the current folder")
-
-#Load the databases
-try:
-	with open('movedb', 'rb') as f:
-		move_library = pickle.load(f)
-	with open('pokedb', 'rb') as f:
-		pokedb = pickle.load(f)
-	with open('multiplierdb', 'rb') as f:
-		multipliers = pickle.load(f)
-except:
-	print("Looks like one or more of the databases/dictionaries needed to run the bot is outdated, please rerun the required update scripts and try again")
-	quit()
-
-#Variables used by the pokemon catching/finding functions
-criteria = dict()
-try:
-	criteria['pokemon'] = config['pokemon']
-	if not criteria['pokemon']:
-		raise Exception("Desired pokemon list empty")
-except:
-	print("Desired pokemon list is missing or empty")
-	try:
-		if config['mode'] == "catch":
-			print ("Cant catch with an empty desired pokemon list, if you meant to catch any pokemon, add \"\" to the desired_pokemon list")
-			quit()
-	except:
-		print("Mode missing")
-		quit()
-
-found = None
-
-def get_platform():
-	platforms = {
-		'linux1' : 'Linux',
-		'linux2' : 'Linux',
-		'darwin' : 'OS X',
-		'win32' : 'Windows',
-		'linux' : 'Windows'
-	}
-	if sys.platform not in platforms:
-		print("OS not supported!", sys.platform)
-		return sys.platform
-
-	return platforms[sys.platform]
-
-#Selenium set up
-PATH = "./req/chromedriver.exe"
-platform = get_platform()
-if platform == "Windows":
-	PATH = "./req/chromedriver.exe"
-else:
-	PATH = "./req/chromedriver"
-
-desired = DesiredCapabilities.CHROME
-desired['goog:loggingPrefs'] = { 'browser':'ALL' }
-driver = webdriver.Chrome(service=Service(PATH), desired_capabilities=desired)
 
 #-------------------------------FUNCTIONS---------------------------------------------
 
@@ -148,14 +80,14 @@ def selector_met(selection_group, key, ppty):
 def meets_criteria(encounter):
 	global criteria
 	if not criteria['pokemon'][encounter.rarity]:
-		print(encounter.rarity, 'selection groups for this rarity are empty')
+#		print(encounter.rarity, 'selection groups for this rarity are empty')
 		return True
 	if encounter.rarity not in criteria['pokemon']:
 		print("RARITY '", encounter.rarity, "' missing from config!")
 		os._exit(1)
 	for selection_group in criteria['pokemon'][encounter.rarity]:
 		if selector_met(criteria['pokemon'][encounter.rarity][selection_group], 'special', encounter.prefix) and selector_met(criteria['pokemon'][encounter.rarity][selection_group], 'caught', encounter.caught) and selector_met(criteria['pokemon'][encounter.rarity][selection_group], 'name', encounter.name):
-			print(selection_group, 'Requirements met!', 'with \'caught\':', encounter.caught, 'special:', encounter.prefix, 'name:', encounter.name)
+			print('Requirements met for \'', selection_group, '\' - With \'caught\':', encounter.caught, '\'special\':', encounter.prefix, '\'name\':', encounter.name)
 			return True
 	return False
 
@@ -256,8 +188,7 @@ class Player:
 			return
 		driver.get(BASE_URL + location)
 
-	def login(self):
-		global config
+	def login(self, config, driver):
 		try:
 			username = config['player']['username']
 			password = config['player']['password']
@@ -291,6 +222,9 @@ class Player:
 		elif amount >= 10:
 			amount = 10
 			locateElement(driver, By.XPATH, '//*[@id="' + types[ball] + '_calc"]/option[' + str(7) + ']').click()
+		elif amount >= 5:
+			amount = 5
+			locateElement(driver, By.XPATH, '//*[@id="' + types[ball] + '_calc"]/option[' + str(6) + ']').click()
 		elif amount <= 5:
 			locateElement(driver, By.XPATH, '//*[@id="' + types[ball] + '_calc"]/option[' + str(amount + 1) + ']').click()
 		return amount
@@ -310,7 +244,6 @@ class Player:
 			for ball in balltypes:
 				if self.items[ball] == None:
 					self.items[ball] = int(locateElement(driver, By.XPATH, '//*[@id="items-content-balls"]/tbody/tr[' + balltypes[ball] + ']/td[4]').text)
-	#			print(ball, "amount:", self.items[ball], "restock:", config['restock'][ball])
 				difference = config['restock'][ball]['goal'] - self.items[ball]
 				if difference > 0 and total_price + (difference * prices[ball]) > self.money:
 					print("You broke, fix it")
@@ -320,11 +253,10 @@ class Player:
 					self.items[ball] += amount
 					total_price += amount * prices[ball]
 					balls_purchased = True
-
 			if balls_purchased:
 				locateElement(driver, By.XPATH, '//*[@id="checkoutButton"]').click()
 			else:
-				break ;
+				break
 
 	#Running this will reset your sidequest progress, happens automatically at 2121 (the final sidequest at the time of writing)
 	def reset_sidequests(self):
@@ -483,11 +415,12 @@ class Player:
 			quit()
 			return False
 		driver.find_element(by=By.TAG_NAME, value="body").send_keys(Keys.SPACE)
-		time.sleep(2) #remove somehow
+#		time.sleep(2) #remove somehow
 		battle.init_hp()
-		if battle.fight() == False:
-			return print("Failed to lower the pokemon enough to capture it")
-		finish_loading()
+		if enemy.level < 75:
+			if battle.fight() == False:
+				return print("Failed to lower the pokemon enough to capture it")
+			finish_loading()
 #		battle.fighttype.continue_button()
 		if battle.catch(self.items) == False:
 			print("Failed to catch the wild pokemon")
@@ -607,6 +540,8 @@ class Battle:
 		self.current_enemy = 0
 
 	def init_hp(self):
+		while 'battle' not in driver.current_url:
+			time.sleep(1)
 		raw_data = locateElement(driver, By.ID, "opponentPoke").text.split('\n')
 		info = [raw_data[i:i+3] for i in range (0, len(raw_data), 3)]
 		for i in range(len(info)):
@@ -653,6 +588,7 @@ class Battle:
 				if "The wild Pokémon has been caught." in locateElement(driver, By.XPATH, '//*[@id="battleForm"]/div/div/strong[2]').text:
 					locateElement(driver, By.XPATH, '//*[@id="battleForm"]/div/input').click()
 					finish_loading()
+					time.sleep(0.5)
 					return True
 				locateElement(driver, By.XPATH, '//*[@id="battleForm"]/div/input').click()
 				finish_loading()
@@ -668,7 +604,7 @@ class Battle:
 	#If all allies have died and the enemy hasn't reached it's target, the function will return False
 	def fight(self, minimum_duration=0):
 		if not self.allies:
-			self.init_hp()
+			self.init_hp('')
 		global last_battle_won
 		while self.current_enemy < len(self.enemies):
 			enemy = self.enemies[self.current_enemy]
@@ -809,21 +745,94 @@ class Move:
 
 #---------------------------------------MAIN----------------------------------------
 
-player = Player()
-player.login()
-player.init_team()
-player.init_inv()
-# player.restock()
+if __name__ == '__main__':
+	if len(sys.argv) > 1:
+		CONFIG_FILE = sys.argv[1]
+	else:
+		CONFIG_FILE = 'config.yml'
 
-if config['mode'] == "catch":
-	while True:
-		if any (player.items[ball] == None or player.items[ball] < config['restock'][ball]['min'] for ball in ['Poké Ball', 'Great Ball', 'Ultra Ball']):
-			player.restock()
-		player.gotta_catch_em_all()
-		player.catch()
-elif config['mode'] == "sidequest":
-	player.sidequest_loop()
-elif config['mode'] == "gyms":
-	player.gyms()
+	sidequest_number = 0
+	last_battle_won = time.time() - 10
+
+	#load config
+	try:
+		with open(CONFIG_FILE, 'r') as f:
+			config = yaml.load(f)
+	except:
+		print("Your config.yml is either missing or corrupted, please make sure there's a valid config.yml in the current folder")
+
+	#Load the databases
+	try:
+		with open('movedb', 'rb') as f:
+			move_library = pickle.load(f)
+		with open('pokedb', 'rb') as f:
+			pokedb = pickle.load(f)
+		with open('multiplierdb', 'rb') as f:
+			multipliers = pickle.load(f)
+	except:
+		print("Looks like one or more of the databases/dictionaries needed to run the bot is outdated, please rerun the required update scripts and try again")
+		quit()
+
+	move_library['Poison Powder'] = ('grass', 0) #temp
+
+	#Variables used by the pokemon catching/finding functions
+	criteria = dict()
+	try:
+		criteria['pokemon'] = config['pokemon']
+		if not criteria['pokemon']:
+			raise Exception("Desired pokemon list empty")
+	except:
+		print("Desired pokemon list is missing or empty")
+		try:
+			if config['mode'] == "catch":
+				print ("Cant catch with an empty desired pokemon list, if you meant to catch any pokemon, add \"\" to the desired_pokemon list")
+				quit()
+		except:
+			print("Mode missing")
+			quit()
+
+	found = None
+
+	def get_platform():
+		platforms = {
+			'linux1' : 'Linux',
+			'linux2' : 'Linux',
+			'darwin' : 'OS X',
+			'win32' : 'Windows',
+			'linux' : 'Windows'
+		}
+		if sys.platform not in platforms:
+			print("OS not supported!", sys.platform)
+			return sys.platform
+
+		return platforms[sys.platform]
+
+	#Selenium set up
+	PATH = "./req/chromedriver.exe"
+	platform = get_platform()
+	if platform == "Windows":
+		PATH = "./req/chromedriver.exe"
+	else:
+		PATH = "./req/chromedriver"
+
+	desired = DesiredCapabilities.CHROME
+	desired['goog:loggingPrefs'] = { 'browser':'ALL' }
+	driver = webdriver.Chrome(service=Service(PATH), desired_capabilities=desired)
+
+	player = Player()
+	player.login(config, driver)
+	player.init_team()
+	player.init_inv()
+
+	if config['mode'] == "catch":
+		while True:
+			if any (player.items[ball] == None or player.items[ball] < config['restock'][ball]['min'] for ball in ['Poké Ball', 'Great Ball', 'Ultra Ball']):
+				player.restock()
+			player.gotta_catch_em_all()
+			player.catch()
+	elif config['mode'] == "sidequest":
+		player.sidequest_loop()
+	elif config['mode'] == "gyms":
+		player.gyms()
 #else if config['mode'] == "clanbattle"
 #	player.clanbattle_loop
