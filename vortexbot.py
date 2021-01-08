@@ -322,8 +322,9 @@ class Player:
 		for gym in todo:
 			driver.get(GYM_BASE_URL + gym)
 			battle = Battle(self.pokemons, Trainer())
-			while battle.fight(10) != True:
-				driver.get(GYM_BASE_URL + gym)
+			battle.init_hp()
+			if battle.fight(10) == False:
+				todo.append(gym)
 		print("You have beaten all the (remaining) gyms!")
 
 	def sidequest_loop(self):
@@ -586,6 +587,7 @@ class Battle:
 			enemy = self.enemies[self.current_enemy]
 			remaining_allies = len([x for x in self.allies if not x.dead()])
 			if remaining_allies == 0:
+				last_battle_won = time.time() #apparantly losing counts as 'finishing a battle'
 				return False
 			for _ in range(remaining_allies):
 				moveset = self.fighttype.get_moveset(self,enemy)
@@ -608,7 +610,9 @@ class Battle:
 						self.continue_button()
 						finish_loading()
 						break
-					if self.target_range[0] == 1: #refactor this at some point
+					#if self.target_range[0] == 1:
+					if type(self.fighttype) == WildEncounter: #refactor this at some point
+						print("type is WildEncounter!")
 						self.continue_button() #breaks on sidequest
 						finish_loading() #same
 				if enemy.hp_in_range(self.target_range):
@@ -627,7 +631,8 @@ class Battle:
 #		print("Damage of current move:", self.current_ally.moves[move].damage)
 #		print("HP before:", hp_before, "HP after:", enemy.hp, "difference:", hp_before - enemy.hp)
 		if hp_before == enemy.hp:
-			if self.target_range[0] == 1:
+			#if self.target_range[0] == 1:
+			if type(self.fighttype) == WildEncounter:
 				self.continue_button()
 			return False
 		if hp_before - enemy.hp != self.current_ally.moves[move].damage and abs(hp_before - enemy.hp - self.current_ally.moves[move].damage) == 1:
@@ -693,7 +698,10 @@ class Move:
 		self.basedmg = 0
 		self.damage = 0
 		if name != "":
-			self.type, self.power = move_library[name]
+			if name in move_library:
+				self.type, self.power = move_library[name]
+			else:
+				self.type, self.power = ('normal', 0)
 		if pokemon != None:
 			self.basedmg = float(pokemon.level * self.power * (1.5 if self.type in pokemon.types else 1) * (1.25 if pokemon.special == "Dark" else 1))
 
@@ -737,8 +745,6 @@ if __name__ == '__main__':
 	except:
 		print("Looks like one or more of the databases/dictionaries needed to run the bot is outdated, please rerun the required update scripts and try again")
 		quit()
-
-	move_library['Poison Powder'] = ('grass', 0) #temp
 
 	#Variables used by the pokemon catching/finding functions
 	criteria = dict()
@@ -799,6 +805,14 @@ if __name__ == '__main__':
 			player.catch()
 	elif config['mode'] == "sidequest":
 		player.sidequest_loop()
+	elif config['mode'] == 'wildfight':
+		config['pokemon']['COMMON'] = {}
+		while True:
+			player.gotta_catch_em_all()
+			driver.find_element(by=By.TAG_NAME, value="body").send_keys(Keys.SPACE)
+			battle = Battle(player.pokemons, WildEncounter((-1000,0)))
+			battle.init_hp()
+			battle.fight(10)
 	elif config['mode'] == "gyms":
 		player.gyms()
 	#elif config['mode'] == "clanbattle"

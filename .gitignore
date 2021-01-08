@@ -2,6 +2,7 @@ config.yml
 reward_*
 main.js
 *_notes.txt
+config_*.yml
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
