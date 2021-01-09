@@ -168,9 +168,9 @@ class Player:
 		self.items = dict()
 		self.money = 0
 
-	def move(self, location):
+	def move(self, location, resubmit_protect=True):
 		BASE_URL = "https://www.pokemon-vortex.com/"
-		if driver.current_url == BASE_URL + location:
+		if resubmit_protect and driver.current_url == BASE_URL + location:
 			return
 		driver.get(BASE_URL + location)
 
@@ -299,7 +299,7 @@ class Player:
 
 	def gyms(self, only_unobtained=True):
 		GYM_BASE_URL = "https://www.pokemon-vortex.com/battle-gym/"
-
+		self.move('gyms')
 		if only_unobtained:
 			driver.get('https://www.pokemon-vortex.com/gyms/')
 			notdone = driver.find_elements(by=By.XPATH, value='//*[@class="notDone"]/../..')
@@ -814,6 +814,12 @@ if __name__ == '__main__':
 			battle.init_hp()
 			battle.fight(10)
 	elif config['mode'] == "gyms":
-		player.gyms()
+		player.gyms(only_unobtained=False)
+	else:
+		while True:
+			player.move(config['mode'], False)
+			battle = Battle(player.pokemons, Trainer())
+			battle.init_hp()
+			battle.fight(10)
 	#elif config['mode'] == "clanbattle"
 	#	player.clanbattle_loop
