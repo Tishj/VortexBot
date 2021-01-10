@@ -327,6 +327,13 @@ class Player:
 				todo.append(gym)
 		print("You have beaten all the (remaining) gyms!")
 
+	def clanbattle_loop(self):
+		while True:
+			self.move('battle-clan/1', resubmit_protect=False)
+			battle = Battle(self.pokemons, Trainer())
+			battle.init_hp()
+			battle.fight()
+
 	def sidequest_loop(self):
 		global sidequest_number
 		driver.get('https://www.pokemon-vortex.com/sidequests/')
@@ -815,11 +822,11 @@ if __name__ == '__main__':
 			battle.fight(10)
 	elif config['mode'] == "gyms":
 		player.gyms(only_unobtained=False)
+	elif config['mode'] == "clanbattle":
+		player.clanbattle_loop()
 	else:
 		while True:
 			player.move(config['mode'], False)
 			battle = Battle(player.pokemons, Trainer())
 			battle.init_hp()
 			battle.fight(10)
-	#elif config['mode'] == "clanbattle"
-	#	player.clanbattle_loop
