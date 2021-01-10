@@ -47,6 +47,7 @@ It's a YML file that you will need to set up before starting the bot, the fields
      - `not in collection` which is `caught: 0` (not obtained)
      - `shiniesss` which is `special: Shiny`
      - `unhealthy obsession` which is `special: Metallic` AND `name: Klink`
+ 
     And will always catch other rarity types because they have no group(s)
     ```
     pokemon:
