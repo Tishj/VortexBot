@@ -94,7 +94,9 @@ It's a YML file that you will need to set up before starting the bot, the fields
   - `gyms` - Battle all required (remaining) gyms needed to catch legendaries (excludes the final battles).
   - `clanbattle` - Similar to sidequest, fight clanbattles until stopped.
   - `wildfight` - Instead of catching wild pokemon, you can defeat any pokemon from your selection groups.
-  - `anything else` Use this option to fight a trainer or gym on repeat, for example: `battle-gym/Brock`
+
+  If anything else is put as `mode` it will be used like so `https://www.pokemon-vortex.com/` + `mode` and will fight this url on repeat.
+  For example: `battle-gym/Brock` would fight the first gym on repeat
 
 ### Disclaimer
 I take no responsibility if your account got banned because you used this tool
