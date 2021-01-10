@@ -10,9 +10,9 @@ To install all the dependencies, run:
 
 It is recommended to update the move, multiplier and pokemon database files, but might not be required
 To do so run:
-`python3 update_movedb.py`
-`python3 update_multiplierdb.py`
-`python3 update_pokedb.py`
+- `python3 update_movedb.py`
+- `python3 update_multiplierdb.py`
+- `python3 update_pokedb.py`
 
 ###  - Selenium
 
