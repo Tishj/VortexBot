@@ -44,9 +44,9 @@ It's a YML file that you will need to set up before starting the bot, the fields
 - ##### Pokemon
     For every rarity type, namely `COMMON`, `RARE`, `LEGENDARY`, `ULTRA` you can set up groups to select pokemon on, or leave them empty to catch every pokemon of that rarity
     For example below config will only catch COMMON pokemon if they meet the property requirement(s) of one of the following  groups:
-      - `not in collection` which is `caught: 0` (not obtained)
-      - `shiniesss` which is `special: Shiny`
-      - `unhealthy obsession` which is `special: Metallic` AND `name: Klink`
+     - `not in collection` which is `caught: 0` (not obtained)
+     - `shiniesss` which is `special: Shiny`
+     - `unhealthy obsession` which is `special: Metallic` AND `name: Klink`
     And will always catch other rarity types because they have no group(s)
     ```
     pokemon:
@@ -68,18 +68,21 @@ It's a YML file that you will need to set up before starting the bot, the fields
     ```
     The list of properties that can be used in the groups is:
     - ##### Properties:
-      `caught`
-            ---------- `0` (not obtained)
-            ---------- `1` (obtained, but not this season)
-            ---------- `2` (obtained, this season)
-      `name`
-            ---------- `Swablu` (any pokemon name from that rarity)
-      `special`
-            ---------- `Shiny`
-            ---------- `Shadow`
-            ---------- `Dark`
-            ---------- `Mystic`
-            ---------- `Metallic`
+     `caught` 
+     
+		'0' - (not obtained)
+        '1' - (obtained, but not this season)
+        '2' - (obtained, this season)
+     `name` 
+     
+		'Swablu' - (any pokemon name from that rarity)
+     `special` 
+     
+		'Shiny'
+		'Shadow'
+		'Dark'
+		'Mystic'
+		'Metallic'
 
 - ##### Restock
   For every regular pokeball (Poke Ball, Great Ball and Ultra Ball) specify at what point the bot should restock them (`min`) and up to what amount it should buy them (`goal`)
