@@ -10,9 +10,9 @@ To install all the dependencies, run:
 
 It is recommended to update the move, multiplier and pokemon database files, but might not be required
 To do so run:
-`python3 update_movedb.py`
-`python3 update_multiplierdb.py`
-`python3 update_pokedb.py`
+- `python3 update_movedb.py`
+- `python3 update_multiplierdb.py`
+- `python3 update_pokedb.py`
 
 ###  - Selenium
 
@@ -44,9 +44,10 @@ It's a YML file that you will need to set up before starting the bot, the fields
 - ##### Pokemon
     For every rarity type, namely `COMMON`, `RARE`, `LEGENDARY`, `ULTRA` you can set up groups to select pokemon on, or leave them empty to catch every pokemon of that rarity
     For example below config will only catch COMMON pokemon if they meet the property requirement(s) of one of the following  groups:
-      - `not in collection` which is `caught: 0` (not obtained)
-      - `shiniesss` which is `special: Shiny`
-      - `unhealthy obsession` which is `special: Metallic` AND `name: Klink`
+     - `not in collection` which is `caught: 0` (not obtained)
+     - `shiniesss` which is `special: Shiny`
+     - `unhealthy obsession` which is `special: Metallic` AND `name: Klink`
+ 
     And will always catch other rarity types because they have no group(s)
     ```
     pokemon:
@@ -68,18 +69,21 @@ It's a YML file that you will need to set up before starting the bot, the fields
     ```
     The list of properties that can be used in the groups is:
     - ##### Properties:
-      `caught`
-            ---------- `0` (not obtained)
-            ---------- `1` (obtained, but not this season)
-            ---------- `2` (obtained, this season)
-      `name`
-            ---------- `Swablu` (any pokemon name from that rarity)
-      `special`
-            ---------- `Shiny`
-            ---------- `Shadow`
-            ---------- `Dark`
-            ---------- `Mystic`
-            ---------- `Metallic`
+     `caught` 
+     
+		'0' - (not obtained)
+        '1' - (obtained, but not this season)
+        '2' - (obtained, this season)
+     `name` 
+     
+		'Swablu' - (any pokemon name from that rarity)
+     `special` 
+     
+		'Shiny'
+		'Shadow'
+		'Dark'
+		'Mystic'
+		'Metallic'
 
 - ##### Restock
   For every regular pokeball (Poke Ball, Great Ball and Ultra Ball) specify at what point the bot should restock them (`min`) and up to what amount it should buy them (`goal`)
@@ -90,7 +94,9 @@ It's a YML file that you will need to set up before starting the bot, the fields
   - `gyms` - Battle all required (remaining) gyms needed to catch legendaries (excludes the final battles).
   - `clanbattle` - Similar to sidequest, fight clanbattles until stopped.
   - `wildfight` - Instead of catching wild pokemon, you can defeat any pokemon from your selection groups.
-  - `anything else` Use this option to fight a trainer or gym on repeat, for example: `battle-gym/Brock`
+
+  If anything else is put as `mode` it will be used like so `https://www.pokemon-vortex.com/` + `mode` and will fight this url on repeat.
+  For example: `battle-gym/Brock` would fight the first gym on repeat
 
 ### Disclaimer
 I take no responsibility if your account got banned because you used this tool
