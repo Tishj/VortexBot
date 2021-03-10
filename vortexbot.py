@@ -165,7 +165,7 @@ class Encounter:
 class Player:
 	def __init__(self):
 		self.pokemons = []
-		self.items = dict()
+		self.items = { 'Poké Ball' : None, 'Great Ball' : None, 'Ultra Ball' : None, 'Beast Ball' : None }
 		self.money = 0
 
 	def move(self, location, resubmit_protect=True):
@@ -606,14 +606,17 @@ class Battle:
 					while True:
 						if self.attack(move) == True or self.current_ally.dead():
 							break
-					if self.current_ally.dead() or enemy.hp_in_range(self.target_range):
-						if enemy.hp_in_range(self.target_range) and self.last_enemy():
+					if self.current_ally.dead() or enemy.hp_in_range(self.target_range): #if the fight is "over"
+						if (enemy.hp_in_range(self.target_range) and self.last_enemy()) or (self.current_ally.dead() and remaining_allies == 1):
 							while time.time() <= last_battle_won + minimum_duration:
 								time.sleep(0.5)
 							self.continue_button()
 							finish_loading()
 							last_battle_won = time.time()
-							return True
+							if (enemy.hp_in_range(self.target_range)):
+								return True
+							else:
+								return False
 						self.continue_button()
 						finish_loading()
 						break
