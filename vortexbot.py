@@ -101,7 +101,9 @@ def evaluate_pokemon_info(mutex, pokefound, last_pokemon):
 	global found
 	global criteria
 	mutex.acquire(1)
-	encounter = driver.execute_script('return Phaser.Display.Canvas.CanvasPool.pool[2].parent.scene.encounterProfile.encounter;')
+	# encounter = driver.execute_cdp_cmd('Phaser.Display.Canvas.CanvasPool.pool[2].parent.scene.encounterProfile?.encounter', {})
+	encounter = json.loads(driver.execute_script('return (JSON.stringify(Phaser.Display.Canvas.CanvasPool.pool[2].parent.scene.encounterProfile.encounter));'))
+	# print(encounter)
 	mutex.release()
 	newUID = None if encounter == None else encounter['id']
 	if encounter and newUID and (evaluate_pokemon_info.UID == None or evaluate_pokemon_info.UID != newUID):
@@ -112,11 +114,14 @@ def evaluate_pokemon_info(mutex, pokefound, last_pokemon):
 		pokemon.level = encounter['level']
 		pokemon.caught = encounter['caught']
 		pokemon.rarity = encounter['pokemon']['rarity']
-		if meets_criteria(pokemon):
-			pokefound.acquire(1)
-			found = pokemon
-			pokefound.release()
-			return True
+		# print(pokemon.name)
+		# if meets_criteria(pokemon):
+		# 	pokefound.acquire(1)
+		# 	found = pokemon
+		# 	pokefound.release()
+		# 	return True
+		found = pokemon
+		return True
 	return False
 
 #Get the name of the current encountered pokemon and see if it matches the list of pokemon we're looking to catch
@@ -125,6 +130,7 @@ def check_pokemon_name(mutex, pokefound):
 	wrapper = [last_pokemon]
 	while True:
 		if evaluate_pokemon_info(mutex, pokefound, wrapper):
+			print("GOTTA CATCH EM ALL")
 			return
 #		print(wrapper[0])
 		time.sleep(0.5)
@@ -185,6 +191,7 @@ class Player:
 			quit()
 
 		driver.get("https://www.pokemon-vortex.com/login/")
+		# locateElement(driver, By.XPATH, '/html/body/div[7]/div[2]/div[1]/div[2]/div[2]/button[1]/p').click()
 		username_field = driver.find_element(by=By.ID, value="myusername")
 		password_field = driver.find_element(by=By.ID, value="mypassword")
 		login_button = driver.find_element(by=By.ID, value="submit")
@@ -352,7 +359,7 @@ class Player:
 
 	def sidequest(self):
 		global sidequest_number
-		driver.get('https://www.pokemon-vortex.com/battle-sidequest/' + str(sidequest_number + 1))
+		driver.get(f'https://www.pokemon-vortex.com/battle-sidequest/{sidequest_number + 1}')
 		if driver.current_url == "https://www.pokemon-vortex.com/sidequests/":
 			driver.find_element(by=By.XPATH, value='//*[@id="ajax"]/div[2]/form/button').click()
 			reward = locateElement(driver, By.XPATH, '//*[@id="ajax"]/div[1]/b').text
@@ -738,11 +745,11 @@ if __name__ == '__main__':
 	last_battle_won = time.time() - 10
 
 	#load config
-	try:
-		with open(CONFIG_FILE, 'r') as f:
-			config = yaml.load(f)
-	except:
-		print("Your config.yml is either missing or corrupted, please make sure there's a valid config.yml in the current folder")
+	# try:
+	with open(CONFIG_FILE, 'r') as f:
+		config = yaml.load(f, Loader=yaml.FullLoader)
+	# except:
+	# 	print(f"Could not find/open {CONFIG_FILE}, please make sure there's a valid config.yml in the current folder")
 
 	#Load the databases
 	try:
@@ -798,7 +805,12 @@ if __name__ == '__main__':
 
 	desired = DesiredCapabilities.CHROME
 	desired['goog:loggingPrefs'] = { 'browser':'ALL' }
-	driver = webdriver.Chrome(service=Service(PATH), desired_capabilities=desired)
+	# driver = webdriver.Chrome(service=Service(PATH), desired_capabilities=desired)
+	# print(f"driver_url = {driver.command_executor._url}")
+	# print(f"driver_session_id = {driver.session_id}")
+	driver = webdriver.Remote(command_executor="http://localhost:56341",desired_capabilities={})
+	driver.close()   # this prevents the dummy browser
+	driver.session_id = "ce3014d75de6832b09b642281ce6d5e7"
 
 #-----------------------------------------MAIN-------------------------------------------
 
