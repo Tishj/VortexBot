@@ -4,11 +4,16 @@
 ### - IMPORTANT
 'catch' functionality is "working" but requires quite a bit of setup\
 The workaround requires us to:
-- Start a chromedriver (through selenium) (WITHOUT CLOSING IT)
-- Enable local overrides
-- Override the 'main.js' from the network panel
-- Edit the 'main.js' to remove the Proxy wrapper for Phaser
-- Attach to the still running chromedriver (through selenium)
+- Create a new Chrome Profile
+- Start a chromedriver that uses this profile(through selenium) (WITHOUT CLOSING IT)
+- Click the Consent button
+- Enable local overrides, selecting the VortexBot folder
+- press 'Allow' to let the local overrides use this folder
+- go to `chrome://version` and copy the Profile Path, put it in the `config.yml` at `profile_path: "PASTE_THE_PATH_HERE"`
+- Close the browser (full quit)
+
+Then the bot can be started normally
+(if the script crashes, make sure there is no chromedriver open currently, chrome profiles can only be active in one browser)
 
 Bot for pokemon-vortex.com v5, running in Python with Selenium in Chrome (on Windows and Mac)
 
