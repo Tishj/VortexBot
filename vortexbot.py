@@ -191,7 +191,7 @@ class Player:
 			quit()
 
 		driver.get("https://www.pokemon-vortex.com/login/")
-		# locateElement(driver, By.XPATH, '/html/body/div[7]/div[2]/div[1]/div[2]/div[2]/button[1]/p').click()
+		locateElement(driver, By.XPATH, '/html/body/div[7]/div[2]/div[1]/div[2]/div[2]/button[1]/p').click()
 		username_field = driver.find_element(by=By.ID, value="myusername")
 		password_field = driver.find_element(by=By.ID, value="mypassword")
 		login_button = driver.find_element(by=By.ID, value="submit")
@@ -805,12 +805,12 @@ if __name__ == '__main__':
 
 	desired = DesiredCapabilities.CHROME
 	desired['goog:loggingPrefs'] = { 'browser':'ALL' }
-	# driver = webdriver.Chrome(service=Service(PATH), desired_capabilities=desired)
+	driver = webdriver.Chrome(service=Service(PATH), desired_capabilities=desired)
 	# print(f"driver_url = {driver.command_executor._url}")
 	# print(f"driver_session_id = {driver.session_id}")
-	driver = webdriver.Remote(command_executor="http://localhost:56341",desired_capabilities={})
-	driver.close()   # this prevents the dummy browser
-	driver.session_id = "ce3014d75de6832b09b642281ce6d5e7"
+	# driver = webdriver.Remote(command_executor="http://localhost:56341",desired_capabilities={})
+	# driver.close()   # this prevents the dummy browser
+	# driver.session_id = "ce3014d75de6832b09b642281ce6d5e7"
 
 #-----------------------------------------MAIN-------------------------------------------
 
