@@ -1,6 +1,15 @@
 
 #  VortexBot v5
 
+### - IMPORTANT
+'catch' functionality is "working" but requires quite a bit of setup\
+The workaround requires us to:
+- Start a chromedriver (through selenium) (WITHOUT CLOSING IT)
+- Enable local overrides
+- Override the 'main.js' from the network panel
+- Edit the 'main.js' to remove the Proxy wrapper for Phaser
+- Attach to the still running chromedriver (through selenium)
+
 Bot for pokemon-vortex.com v5, running in Python with Selenium in Chrome (on Windows and Mac)
 
 ### - Setup
