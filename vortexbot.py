@@ -747,7 +747,7 @@ if __name__ == '__main__':
 	#load config
 	# try:
 	with open(CONFIG_FILE, 'r') as f:
-		config = yaml.load(f, Loader=yaml.FullLoader)
+		config = yaml.load(f)
 	# except:
 	# 	print(f"Could not find/open {CONFIG_FILE}, please make sure there's a valid config.yml in the current folder")
 
@@ -805,12 +805,17 @@ if __name__ == '__main__':
 
 	desired = DesiredCapabilities.CHROME
 	desired['goog:loggingPrefs'] = { 'browser':'ALL' }
+	options = webdriver.ChromeOptions()
+	profile_path = config["profile_path"]
+	options.add_argument(f"user-data-dir={profile_path}") #Path to your chrome profile
+	options.add_argument("auto-open-devtools-for-tabs=true") #Path to your chrome profile
+	driver = webdriver.Chrome(service=Service(PATH), options=options)
 	# driver = webdriver.Chrome(service=Service(PATH), desired_capabilities=desired)
 	# print(f"driver_url = {driver.command_executor._url}")
 	# print(f"driver_session_id = {driver.session_id}")
-	driver = webdriver.Remote(command_executor="http://localhost:56341",desired_capabilities={})
-	driver.close()   # this prevents the dummy browser
-	driver.session_id = "ce3014d75de6832b09b642281ce6d5e7"
+	# driver = webdriver.Remote(command_executor="http://localhost:56341",desired_capabilities={})
+	# driver.close()   # this prevents the dummy browser
+	# driver.session_id = "ce3014d75de6832b09b642281ce6d5e7"
 
 #-----------------------------------------MAIN-------------------------------------------
 
